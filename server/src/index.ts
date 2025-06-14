@@ -12,7 +12,7 @@ import authRouter from "./routes/v1/auth.routes";
 import systemRouter from "./routes/v1/system.routes";
 import { initDatabaseConnection } from "./database/database";
 import initDatabase from "./database/initDatabase";
-
+import cookieParser from "cookie-parser";
 
 initDatabaseConnection().then(() => {
   console.log("conectado com banco de dados")
@@ -25,13 +25,23 @@ const PORT = process.env.PORT || 3000;
 // Middlewares de segurança e performance
 app.use(helmet());
 app.use(cors({
-  origin: "*", // Ajuste conforme necessário
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  origin: "http://localhost:5173", // Ajuste conforme necessário
+  methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+  credentials: true
 }));
+app.use(express.json());
 app.use(compression());
 app.use(morgan("dev"));
 app.use(express.json());
+app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
+// app.use(express.static('uploads/images'));
+app.use('/images', express.static('uploads/images', {
+  setHeaders(res, path) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  }
+}));
 
 app.use('/api/v1', authRouter);
 app.use('/api/v1', systemRouter);
