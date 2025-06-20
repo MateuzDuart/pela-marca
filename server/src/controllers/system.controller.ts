@@ -4,6 +4,16 @@ import updateUserSchema from '../zodSchemas/userUpdateSchema';
 import { sequelize } from '../database/database';
 import path from 'path';
 import fs from 'fs';
+import peladaService from '../services/pelada.service';
+import { createPeladaSchema } from '../zodSchemas/createPeladaSchema';
+import userService from '../services/user.service';
+import { ZodError } from 'zod';
+import { roleMember } from '../modules/role';
+import { Eschedule } from '../modules/schedule';
+import { updatePeladaSchema } from '../zodSchemas/updatePeladaSchema';
+import PeladaServiceError from '../Errors/PeladaServiceError';
+import { acceptInviteSchema } from '../zodSchemas/acceptInviteSchema';
+import { getMemberSchema } from '../zodSchemas/getMemberSchema';
 
 export default new class SystemController {
   async home(req: Request, res: Response): Promise<any> {
@@ -35,7 +45,6 @@ export default new class SystemController {
       picture: isGooglePicute ? user.picture : `${process.env.BASE_URL}/images/${user.picture}`,
     });
   }
-
 
   async updateProfile(req: Request, res: Response): Promise<any> {
     const userId = (req as any).userId;
@@ -98,6 +107,387 @@ export default new class SystemController {
       console.error("Erro ao atualizar perfil:", err);
       return res.status(400).json({
         message: err instanceof Error ? err.message : "Erro ao atualizar perfil",
+      });
+    }
+  }
+
+
+  // tudo para baixo já está usando services
+  async createPelada(req: Request, res: Response): Promise<any> {
+    const userId = (req as any).userId;
+    const schedule: Record<Eschedule, { hour: string, isActive?: boolean }> = {
+      monday: { hour: "00:00" },
+      tuesday: { hour: "00:00" },
+      wednesday: { hour: "00:00" },
+      thursday: { hour: "00:00" },
+      friday: { hour: "00:00" },
+      saturday: { hour: "00:00" },
+      sunday: { hour: "00:00" },
+    }
+
+    const transaction = await sequelize.transaction();
+    try {
+      const data = createPeladaSchema.parse(req.body || {});
+
+      const userExists = await userService.checkIfUserExists(userId)
+      if (!userExists) {
+        throw new Error("Usuário nao encontrado");
+      }
+
+      const pelada = await peladaService.createPelada(data, transaction);
+      await peladaService.addMemberToPelada({
+        memberId: userId,
+        peladaId: pelada.id,
+        role: roleMember.OWNER
+      }, transaction);
+
+      await peladaService.createScheduleOfPelada({ days: { ...schedule, ...data.schedule }, peladaId: pelada.id }, transaction);
+
+      await transaction.commit();
+      return res.status(201).json({
+        message: "Pelada criada com sucesso",
+      });
+    } catch (err) {
+      await transaction.rollback();
+
+      if (err instanceof ZodError) {
+        return res.status(400).json({ message: err.issues[0].message });
+      }
+      if (err instanceof PeladaServiceError) {
+        return res.status(400).json({
+          message: err instanceof Error ? err.message : "Erro ao criar pelada",
+        });
+      }
+      return res.status(400).json({
+        message: "Erro ao criar pelada",
+      });
+    }
+  }
+
+  async getPeladasAsMember(req: Request, res: Response): Promise<any> {
+    const userId = (req as any).userId;
+
+    try {
+      const peladas = await peladaService.getPeladasAsMember(userId);
+
+      return res.status(200).json(peladas);
+    } catch (error) {
+      if (error instanceof PeladaServiceError) {
+        return res.status(400).json({
+          message: error instanceof Error ? error.message : "Erro ao buscar peladas",
+        });
+      }
+      console.log(error);
+      return res.status(400).json({
+        message: "Erro ao buscar peladas",
+      });
+    }
+
+  }
+
+  async getPeladasAsAdmin(req: Request, res: Response): Promise<any> {
+    const userId = (req as any).userId;
+    try {
+      const peladas = await peladaService.getPeladasAsAdmin(userId);
+
+      return res.status(200).json(peladas);
+    } catch (error) {
+      if (error instanceof PeladaServiceError) {
+        return res.status(400).json({
+          message: error instanceof Error ? error.message : "Erro ao buscar peladas",
+        });
+      }
+      return res.status(400).json({
+        message: "Erro ao buscar peladas",
+      });
+    }
+
+  }
+
+  async updatePelada(req: Request, res: Response): Promise<any> {
+    const userId = (req as any).userId;
+    const peladaId = req.params.id;
+
+    const transaction = await sequelize.transaction();
+    try {
+      const data = updatePeladaSchema.parse(req.body || {});
+      await peladaService.updatePelada({ userId, peladaId, newData: data }, transaction);
+
+      const days = data.schedule as Record<Eschedule, { hour: string, isActive?: boolean }>
+      if (days) {
+        await peladaService.updateScheduleOfPelada({ userId, peladaId, days }, transaction);
+      }
+      await transaction.commit();
+      return res.status(200).json({ message: "Pelada atualizada com sucesso" });
+    } catch (err) {
+      await transaction.rollback();
+      if (err instanceof ZodError) {
+        return res.status(400).json({ message: err.issues[0].message });
+      }
+      if (err instanceof PeladaServiceError) {
+        return res.status(400).json({
+          message: err instanceof Error ? err.message : "Erro ao atualizar pelada",
+        });
+      }
+      console.log(err);
+      return res.status(400).json({
+        message: "Erro ao atualizar pelada",
+      });
+    }
+  }
+
+  async sendInvite(req: Request, res: Response): Promise<any> {
+    const userId = (req as any).userId;
+    const peladaId = req.params.id;
+
+    const transaction = await sequelize.transaction();
+    try {
+      await peladaService.sendInvite({ userId, peladaId }, transaction);
+
+      await transaction.commit();
+      return res.status(200).json({ message: "Convite enviado com sucesso" });
+    } catch (err) {
+      await transaction.rollback();
+      if (err instanceof PeladaServiceError) {
+        return res.status(400).json({
+          message: err instanceof Error ? err.message : "Erro ao enviar convite",
+        });
+      }
+      return res.status(400).json({
+        message: "Erro ao enviar convite",
+      });
+    }
+  }
+
+  async getInvites(req: Request, res: Response): Promise<any> {
+    const userId = (req as any).userId;
+    const peladaId = req.params.id;
+
+    try {
+      const invites = await peladaService.getInvites({ userId, peladaId });
+      return res.status(200).json(invites);
+    } catch (error) {
+      if (error instanceof PeladaServiceError) {
+        return res.status(400).json({
+          message: error instanceof Error ? error.message : "Erro ao buscar convites",
+        });
+      }
+      console.log(error);
+      return res.status(400).json({
+        message: "Erro ao buscar convites",
+      });
+    }
+
+  }
+
+  async acceptInvite(req: Request, res: Response): Promise<any> {
+    const userId = (req as any).userId;
+    const peladaId = req.params.id;
+
+    const transaction = await sequelize.transaction();
+    try {
+      const data = acceptInviteSchema.parse(req.body || {});
+      await peladaService.acceptInvite({ userId, peladaId, inviteId: data.invite_id }, transaction);
+
+      await transaction.commit();
+      return res.status(200).json({ message: "Convite aceito com sucesso" });
+    } catch (error) {
+      await transaction.rollback();
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: error.issues[0].message });
+      }
+      if (error instanceof PeladaServiceError) {
+        return res.status(400).json({
+          message: error instanceof Error ? error.message : "Erro ao aceitar convite",
+        });
+      }
+      console.log(error);
+      return res.status(400).json({
+        message: "Erro ao aceitar convite",
+      });
+    }
+  }
+
+  async rejectInvite(req: Request, res: Response): Promise<any> {
+    const userId = (req as any).userId;
+    const peladaId = req.params.id;
+
+    const transaction = await sequelize.transaction();
+    try {
+      const data = acceptInviteSchema.parse(req.body || {});
+      await peladaService.rejectInvite({ userId, peladaId, inviteId: data.invite_id }, transaction);
+
+      await transaction.commit();
+      return res.status(200).json({ message: "Convite rejeitado com sucesso" });
+    } catch (error) {
+      await transaction.rollback();
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: error.issues[0].message });
+      }
+      if (error instanceof PeladaServiceError) {
+        return res.status(400).json({
+          message: error instanceof Error ? error.message : "Erro ao rejeitar convite",
+        });
+      }
+      console.log(error);
+      return res.status(400).json({
+        message: "Erro ao rejeitar convite",
+      });
+    }
+  }
+
+  async getMembers(req: Request, res: Response): Promise<any> {
+    const peladaId = req.params.id;
+
+    try {
+      const members = await peladaService.getMembers(peladaId);
+      return res.status(200).json(members);
+    } catch (error) {
+      if (error instanceof PeladaServiceError) {
+        return res.status(400).json({
+          message: error instanceof Error ? error.message : "Erro ao buscar membros",
+        });
+      }
+      return res.status(400).json({
+        message: "Erro ao buscar membros",
+      });
+    }
+  }
+
+  async getMembersAsAdmin(req: Request, res: Response): Promise<any> {
+    const userId = (req as any).userId;
+    const peladaId = req.params.id;
+
+    try {
+      const members = await peladaService.getMembersAsAdmin({ userId, peladaId });
+      return res.status(200).json(members);
+    } catch (error) {
+      if (error instanceof PeladaServiceError) {
+        return res.status(400).json({
+          message: error instanceof Error ? error.message : "Erro ao buscar membros",
+        });
+      }
+      console.log(error);
+      return res.status(400).json({
+        message: "Erro ao buscar membros como administrador",
+      });
+    }
+  }
+
+  async getPeladaAsAdmin(req: Request, res: Response): Promise<any> {
+    const userId = (req as any).userId;
+    const peladaId = req.params.id;
+
+    try {
+      const pelada = await peladaService.getPeladaAsAdmin({ userId, peladaId });
+      return res.status(200).json(pelada);
+    } catch (error) {
+      if (error instanceof PeladaServiceError) {
+        return res.status(400).json({
+          message: error instanceof Error ? error.message : "Erro ao buscar pelada",
+        });
+      }
+      console.log(error);
+      return res.status(400).json({
+        message: "Erro ao buscar pelada como administrador",
+      });
+    }
+  }
+
+  async getPeladaInviteData(req: Request, res: Response): Promise<any> {
+    const userId = (req as any).userId;
+    const peladaId = req.params.id;
+    console.log(userId);
+    try {
+      const data = await peladaService.getPeladaInviteData({ userId, peladaId });
+      return res.status(200).json(data);
+    } catch (error) {
+      if (error instanceof PeladaServiceError) {
+        return res.status(400).json({
+          message: error instanceof Error ? error.message : "Erro ao buscar convites",
+        });
+      }
+      console.log(error);
+      return res.status(400).json({
+        message: "Erro ao buscar convites",
+      });
+    }
+  }
+
+  async deleteMember(req: Request, res: Response): Promise<any> {
+    const userId = (req as any).userId;
+    const peladaId = req.params.id;
+
+    try {
+      const data = getMemberSchema.parse(req.query || {});
+      await peladaService.deleteMemberFromPelada({ userId, peladaId, memberId: data.member_id });
+      return res.status(200).json({ message: "Membro excluído com sucesso" });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: error.issues[0].message });
+      }
+      if (error instanceof PeladaServiceError) {
+        return res.status(400).json({
+          message: error instanceof Error ? error.message : "Erro ao excluir membro",
+        });
+      }
+      console.log(error);
+      return res.status(400).json({
+        message: "Erro ao excluir membro",
+      });
+    }
+  }
+
+  async setAdminRole(req: Request, res: Response): Promise<any> {
+    const userId = (req as any).userId;
+    const peladaId = req.params.id;
+
+    const transaction = await sequelize.transaction();
+    try {
+      const data = getMemberSchema.parse(req.body || {});
+      const response = await peladaService.setAdminRole({ userId, peladaId, memberId: data.member_id }, transaction);
+      await transaction.commit();
+      return res.status(200).json({ message: response.message });
+    } catch (error) {
+      await transaction.rollback();
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: error.issues[0].message });
+      }
+      if (error instanceof PeladaServiceError) {
+        return res.status(400).json({
+          message: error instanceof Error ? error.message : "Erro ao excluir membro",
+        });
+      }
+      console.log(error);
+      return res.status(400).json({
+        message: "Erro ao excluir membro",
+      });
+    }
+  }
+
+  async removeAdminRole(req: Request, res: Response): Promise<any> {
+    const userId = (req as any).userId;
+    const peladaId = req.params.id;
+
+    const transaction = await sequelize.transaction();
+    try {
+      const data = getMemberSchema.parse(req.body || {});
+      const response = await peladaService.removeAdminRole({ userId, peladaId, memberId: data.member_id }, transaction);
+      await transaction.commit();
+      return res.status(200).json({ message: response.message });
+    } catch (error) {
+      await transaction.rollback();
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: error.issues[0].message });
+      }
+      if (error instanceof PeladaServiceError) {
+        return res.status(400).json({
+          message: error instanceof Error ? error.message : "Erro ao excluir membro",
+        });
+      }
+      console.log(error);
+      return res.status(400).json({
+        message: "Erro ao excluir membro",
       });
     }
   }

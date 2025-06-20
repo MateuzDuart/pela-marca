@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config({
-    path: process.env.GLOBAL_ENV || ".env"
+  path: process.env.GLOBAL_ENV || ".env"
 });
 
 import express from "express";
@@ -16,16 +16,26 @@ import cookieParser from "cookie-parser";
 
 initDatabaseConnection().then(() => {
   console.log("conectado com banco de dados")
-  initDatabase({})
+  initDatabase({ alter: true });
 })
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middlewares de segurança e performance
+const allowedOrigins = [
+  'https://pelamarca.com',
+  'https://www.pelamarca.com',
+];
 app.use(helmet());
 app.use(cors({
-  origin: "http://localhost:5173", // Ajuste conforme necessário
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`Origem não permitida: ${origin}`));
+    }
+  },
   methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
   credentials: true
 }));

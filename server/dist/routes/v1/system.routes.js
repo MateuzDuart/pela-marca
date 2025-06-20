@@ -1,0 +1,31 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const system_controller_1 = __importDefault(require("../../controllers/system.controller"));
+const authenticate_1 = require("../../middleware/authenticate");
+const uploadImage_1 = require("../../middleware/uploadImage");
+const optionalAuthentication_1 = require("../../middleware/optionalAuthentication");
+const systemRouter = (0, express_1.Router)();
+systemRouter.get("/", system_controller_1.default.home);
+systemRouter.get("/user", authenticate_1.authenticate, system_controller_1.default.getUserData);
+systemRouter.patch("/user", authenticate_1.authenticate, uploadImage_1.uploadImage.single("image"), system_controller_1.default.updateProfile);
+// pelada
+systemRouter.post("/pelada", authenticate_1.authenticate, system_controller_1.default.createPelada);
+systemRouter.get("/my-peladas", authenticate_1.authenticate, system_controller_1.default.getPeladasAsMember);
+systemRouter.get("/my-peladas-as-admin", authenticate_1.authenticate, system_controller_1.default.getPeladasAsMember);
+systemRouter.patch("/pelada/:id", authenticate_1.authenticate, system_controller_1.default.updatePelada);
+systemRouter.post("/send-invite/:id", authenticate_1.authenticate, system_controller_1.default.sendInvite);
+systemRouter.get("/invites/:id", authenticate_1.authenticate, system_controller_1.default.getInvites);
+systemRouter.post("/accept-invite/:id", authenticate_1.authenticate, system_controller_1.default.acceptInvite);
+systemRouter.post("/reject-invite/:id", authenticate_1.authenticate, system_controller_1.default.rejectInvite);
+systemRouter.get("/members/:id", system_controller_1.default.getMembers);
+systemRouter.get("/members-as-admin/:id", authenticate_1.authenticate, system_controller_1.default.getMembersAsAdmin);
+systemRouter.get("/pelada-as-admin/:id", authenticate_1.authenticate, system_controller_1.default.getPeladaAsAdmin);
+systemRouter.get("/invite/:id", optionalAuthentication_1.optionalAuthentication, system_controller_1.default.getPeladaInviteData);
+systemRouter.delete("/member/:id", authenticate_1.authenticate, system_controller_1.default.deleteMember);
+systemRouter.patch("/member-role/:id", authenticate_1.authenticate, system_controller_1.default.setAdminRole);
+systemRouter.patch("/remove-member-role/:id", authenticate_1.authenticate, system_controller_1.default.removeAdminRole);
+exports.default = systemRouter;

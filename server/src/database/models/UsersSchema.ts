@@ -1,5 +1,8 @@
 import { DataTypes, Model, Optional } from "sequelize";
 import { sequelize } from "../database";
+import { GuestsSchema } from "./GuestsSchema";
+import { MembersSchema } from "./MembersSchema";
+import { PaymentHistoriesSchema } from "./PaymentHistoriesSchema";
 
 interface UsersSchemaAttributes {
   id: string;
@@ -9,12 +12,13 @@ interface UsersSchemaAttributes {
   phone?: string;
   createdAt?: Date;
   updatedAt?: Date;
+
 }
 
 interface UsersSchemaCreationAttributes extends Optional<UsersSchemaAttributes, "id"> {}
 
 export class UsersSchema extends Model<UsersSchemaAttributes, UsersSchemaCreationAttributes>
-  implements UsersSchemaAttributes {
+implements UsersSchemaAttributes {
   public id!: string;
   public name!: string;
   public email!: string;
@@ -22,6 +26,10 @@ export class UsersSchema extends Model<UsersSchemaAttributes, UsersSchemaCreatio
   public phone?: string;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
+  
+  readonly guest?: GuestsSchema[];
+  readonly member?: MembersSchema[];
+  readonly paymentHistories?: PaymentHistoriesSchema[];
 }
 
 UsersSchema.init(

@@ -2,19 +2,20 @@ import { useEffect } from 'react';
 import { FcGoogle } from 'react-icons/fc';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../context/userContext';
+import { API_URL } from '../../config';
 
 export default function Login() {
   const navigate = useNavigate();
   const { user } = useUser();
-  
+
   useEffect(() => {
     if (user) {
-      navigate('/');
+      navigate(-1);
     }
   }, [user]);
 
   const handleLogin = () => {
-    console.log('Fazer login com Google');
+    document.location.href = `${API_URL}/api/v1/auth/google`;
   };
 
   return (

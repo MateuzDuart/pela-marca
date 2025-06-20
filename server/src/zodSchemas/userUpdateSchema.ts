@@ -1,9 +1,5 @@
 import { z } from "zod";
-import DOMPurify from "dompurify";
-import { JSDOM } from "jsdom";
-
-const window = new JSDOM("").window;
-const purify = DOMPurify(window as any);
+import { purify } from "../utils/purify";
 
 const updateUserSchema = z.object({
   name: z

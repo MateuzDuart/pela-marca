@@ -123,11 +123,12 @@ export default new class AuthController {
         httpOnly: false,                  // true em produção
         secure: false,                    // true em produção (HTTPS)
         sameSite: "lax",                  // "lax" ou "strict" em dev
-        domain: "localhost",              // sem porta
+        domain: process.env.HOST!,
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 dias
         path: "/",
       });
-      res.status(200).json({ message: "Token valido" });
+      
+      res.status(200).redirect(`${process.env.FRONT_END_URL}`);
 
     } catch (err) {
       console.error("Erro ao validar token:", err);
