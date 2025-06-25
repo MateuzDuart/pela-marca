@@ -27,7 +27,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   });
 
   const { data: peladas, isLoading: isPeladasLoading } = useQuery<Pelada[]>({
-    queryKey: ['my-peladas'],
+    queryKey: ['my-peladas-as-member'],
     queryFn: getMyPeladas,
     staleTime: 1000 * 60 * 5,
     retry: false,
@@ -39,7 +39,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     queryClient.removeQueries({ queryKey: ['user'] })
-    queryClient.removeQueries({ queryKey: ['my-peladas'] })
+    queryClient.removeQueries({ queryKey: ['my-peladas-as-member'] })
   };
 
   return (

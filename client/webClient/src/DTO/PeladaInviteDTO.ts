@@ -16,5 +16,5 @@ export interface PeladaInviteDTO {
       picture: string
       // email: string
     }
-  }>
+  }>;
 }

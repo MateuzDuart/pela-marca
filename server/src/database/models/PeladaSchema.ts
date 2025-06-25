@@ -1,8 +1,9 @@
 // models/Pelada.ts
 import { DataTypes, Model } from "sequelize";
 import { sequelize } from "../database";
-import { all } from "axios";
 import { EventDaysSchema } from "./EventDaysSchema";
+import { EventsSchema } from "./EventsSchema";
+import { MembersSchema } from "./MembersSchema";
 
 export class PeladasSchema extends Model {
   public id!: string;
@@ -15,6 +16,8 @@ export class PeladasSchema extends Model {
   public confirmation_close_hours_from_event!: number
 
   readonly schedule?: EventDaysSchema[]
+  readonly events?: EventsSchema[]; // Adjust type as needed
+  readonly members?: MembersSchema[];
 }
 
 PeladasSchema.init({

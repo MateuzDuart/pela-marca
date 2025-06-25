@@ -4,6 +4,7 @@ import { DaysOfTheWeek, type schedule } from '../../modules/schedule';
 import { translateWeekDays } from '../../utils/translate';
 import { createPelada } from '../../API/routes';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 
 const defaultSchedule: schedule = Object.values(DaysOfTheWeek).reduce((acc, day) => {
   acc[day] = { hour: '', isActive: false };
@@ -16,7 +17,8 @@ export default function CreatePeladaPage() {
   const [schedule, setSchedule] = useState<schedule>(defaultSchedule);
   const [paymentDay, setPaymentDay] = useState('');
   const [price, setPrice] = useState('');
-
+  const queryClient = useQueryClient();
+  
   const handleCreate = () => {
     const allScheduleHasCorrectHour = Object.values(schedule)
       .filter((day) => day.isActive)
@@ -34,14 +36,18 @@ export default function CreatePeladaPage() {
       }
     }
 
+    console.log(paymentDay);
+
     createPelada({
       name,
       schedule: activeSchedule,
-      paymentDay: Number(paymentDay),
+      paymentDay: Number(paymentDay || 1),
       price: Number(price),
     })
       .then((res) => {
         toast.success(res.message);
+        queryClient.invalidateQueries({ queryKey: ['my-peladas-as-member'] });
+        
         navigate('/');
       })
       .catch((err) => {
@@ -62,7 +68,7 @@ export default function CreatePeladaPage() {
       />
       <div className="flex justify-center">
         <button className="btn btn-primary" onClick={handleCreate}>
-          Create Game
+          Criar Pelada
         </button>
       </div>
     </div>
@@ -150,7 +156,7 @@ const SectionPayment = ({
     <h2 className="text-lg font-semibold">Informações de pagamento</h2>
     <div className="form-control w-full max-w-xs">
       <label className="label">
-        <span className="label-text">Preço</span>
+        <span className="label-text">Preço (opcional)</span>
       </label>
       <input
         type="number"
@@ -163,7 +169,7 @@ const SectionPayment = ({
     </div>
     <div className="form-control w-full max-w-xs">
       <label className="label">
-        <span className="label-text">Dia de pagamento</span>
+        <span className="label-text">Dia de pagamento (opcional)</span>
       </label>
       <input
         type="number"

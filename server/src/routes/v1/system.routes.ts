@@ -13,7 +13,7 @@ systemRouter.patch("/user", authenticate, uploadImage.single("image"),  systemCo
 // pelada
 systemRouter.post("/pelada", authenticate, systemController.createPelada);
 systemRouter.get("/my-peladas", authenticate, systemController.getPeladasAsMember);
-systemRouter.get("/my-peladas-as-admin", authenticate, systemController.getPeladasAsMember);
+systemRouter.get("/my-peladas-as-admin", authenticate, systemController.getPeladasAsAdmin);
 systemRouter.patch("/pelada/:id", authenticate, systemController.updatePelada);
 systemRouter.post("/send-invite/:id", authenticate, systemController.sendInvite);
 systemRouter.get("/invites/:id", authenticate, systemController.getInvites);
@@ -26,6 +26,13 @@ systemRouter.get("/invite/:id", optionalAuthentication, systemController.getPela
 systemRouter.delete("/member/:id", authenticate, systemController.deleteMember);
 systemRouter.patch("/member-role/:id", authenticate, systemController.setAdminRole);
 systemRouter.patch("/remove-member-role/:id", authenticate, systemController.removeAdminRole);
+systemRouter.patch("/payments/:id/pending", authenticate, systemController.setPaymentPending);
+systemRouter.patch("/payments/:id/paid", authenticate, systemController.setPaymentPaid);
+systemRouter.patch("/payments/:id/cancel-pending", authenticate, systemController.cancelPaymentPending);
+systemRouter.delete("/pelada/:id", authenticate, systemController.deletePelada);
+systemRouter.get("/pelada/:id", authenticate, systemController.getPelada);
+systemRouter.patch("/pelada/:id/confirm-attendance", authenticate, systemController.confirmEventAttendance);
+systemRouter.patch("/pelada/:id/cancel-attendance", authenticate, systemController.cancelEventAttendance);
 
 
 export default systemRouter;

@@ -1,12 +1,15 @@
 // models/Evento.ts
 import { DataTypes, Model } from "sequelize";
 import { sequelize } from "../database";
+import { EventConfirmationsSchema } from "./EventConfirmationSchema";
 
 export class EventsSchema extends Model {
   public id!: number;
   public pelada_id!: string;
   public date!: Date;
   public status!: "open" | "closed" | "cancelled";
+
+  readonly confirmations?: EventConfirmationsSchema[]; 
 }
 
 EventsSchema.init({
@@ -21,7 +24,7 @@ EventsSchema.init({
   },
   date: {
     type: DataTypes.DATEONLY,
-    allowNull: false,
+    allowNull: true,
   },
   status: {
     type: DataTypes.ENUM("open", "closed", "cancelled"),

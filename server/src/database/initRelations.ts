@@ -13,25 +13,29 @@ export default async function initRelations() {
   MembersSchema.belongsTo(UsersSchema, {
     foreignKey: "user_id",
     as: "user",
-    onDelete: "NO ACTION",
-    onUpdate: "NO ACTION",
-  });
-
-  MembersSchema.belongsTo(PeladasSchema, {
-    foreignKey: "pelada_id",
-    as: "pelada",
-    onDelete: "NO ACTION",
+    onDelete: "CASCADE",
     onUpdate: "NO ACTION",
   });
 
   UsersSchema.hasMany(MembersSchema, {
     foreignKey: "user_id",
-    as: "member"
+    as: "member",
+    onDelete: "CASCADE",
+  });
+
+  MembersSchema.belongsTo(PeladasSchema, {
+    foreignKey: "pelada_id",
+    as: "pelada",
+    onDelete: "CASCADE",
+    onUpdate: "NO ACTION",
   });
 
   PeladasSchema.hasMany(MembersSchema, {
     foreignKey: "pelada_id",
-    as: "members"
+    as: "members",
+    onDelete: "CASCADE",
+    onUpdate: "NO ACTION",
+    hooks: true,
   });
 
   // Guest relations
@@ -56,20 +60,26 @@ export default async function initRelations() {
 
   PeladasSchema.hasMany(GuestsSchema, {
     foreignKey: "pelada_id",
-    as: "guestCandidates"
+    as: "guestCandidates",
+    onDelete: "CASCADE",
+    onUpdate: "NO ACTION",
+    hooks: true,
   });
 
   // Event relations
   EventsSchema.belongsTo(PeladasSchema, {
     foreignKey: "pelada_id",
     as: "pelada",
-    onDelete: "NO ACTION",
+    onDelete: "CASCADE",
     onUpdate: "NO ACTION",
   });
 
   PeladasSchema.hasMany(EventsSchema, {
     foreignKey: "pelada_id",
-    as: "eventos",
+    as: "events",
+    onDelete: "CASCADE",
+    onUpdate: "NO ACTION",
+    hooks: true,
   });
 
   // payment relations
@@ -81,42 +91,75 @@ export default async function initRelations() {
   });
 
   UsersSchema.hasMany(PaymentHistoriesSchema, {
-    foreignKey: "id",
+    foreignKey: "user_id",
     as: "paymentHistories",
   });
 
-  PaymentHistoriesSchema.belongsTo(PeladasSchema, {
-    foreignKey: "id",
-    as: "paymentPelada",
+  PaymentHistoriesSchema.belongsTo(UsersSchema, {
+    foreignKey: "confirmed_by",
+    as: "confirmedByUser",
+    onDelete: "NO ACTION",
+    onUpdate: "NO ACTION",
+  });
+  UsersSchema.hasMany(PaymentHistoriesSchema, {
+    foreignKey: "confirmed_by",
+    as: "confirmedByUser",
     onDelete: "NO ACTION",
     onUpdate: "NO ACTION",
   });
 
+  PaymentHistoriesSchema.belongsTo(PeladasSchema, {
+    foreignKey: "pelada_id",
+    as: "paymentPelada",
+    onDelete: "CASCADE",
+    onUpdate: "NO ACTION",
+  });
+
   PeladasSchema.hasMany(PaymentHistoriesSchema, {
-    foreignKey: "id",
+    foreignKey: "pelada_id",
     as: "paymentHistories",
+    onDelete: "CASCADE",
+    onUpdate: "NO ACTION",
+    hooks: true,
   });
 
   // Relacionamento: EventDay pertence a uma Pelada
   EventDaysSchema.belongsTo(PeladasSchema, {
     foreignKey: 'pelada_id',
     as: 'pelada',
+    onDelete: "CASCADE",
   });
 
   PeladasSchema.hasMany(EventDaysSchema, {
     foreignKey: "pelada_id",
     as: "schedule",
+    onDelete: "CASCADE",
+    onUpdate: "NO ACTION",
+    hooks: true,
   });
 
   // Event Comfirmation Relations
   EventsSchema.hasMany(EventConfirmationsSchema, {
     foreignKey: "event_id",
     as: "confirmations",
+    onDelete: "CASCADE",
+    onUpdate: "NO ACTION",
+    hooks: true,
   });
 
   MembersSchema.hasMany(EventConfirmationsSchema, {
     foreignKey: "member_id",
     as: "confirmations",
+    onDelete: "CASCADE",
+    onUpdate: "NO ACTION",
+    hooks: true,
+  });
+  EventConfirmationsSchema.belongsTo(MembersSchema, {
+    foreignKey: "member_id",
+    as: "member",
+    onDelete: "CASCADE",
+    onUpdate: "NO ACTION",
+    hooks: true,
   });
 
 } 

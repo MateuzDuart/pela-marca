@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast';
 import styles from './styles.module.css';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type Pelada from '../../modules/Pelada';
-import { acceptInvite, exludeMember, getInvites, getMembersAsAdmin, getMyPeladasAsAdmin, getPeladaAsAdmin, rejectInvite, removeAdminRole, setAdminRole, updatePeladaInformations } from '../../API/routes';
+import { acceptInvite, cancelPaymentPending, deletePelada, exludeMember, getInvites, getMembersAsAdmin, getMyPeladasAsAdmin, getPeladaAsAdmin, rejectInvite, removeAdminRole, setAdminRole, setPaymentPaid, setPaymentPending, updatePeladaInformations } from '../../API/routes';
 import { DaysOfTheWeek, type schedule } from '../../modules/schedule';
 import type { Member } from '../../modules/Member';
 import type { Invite } from '../../modules/Invite';
@@ -24,6 +24,7 @@ function daisyToast(message: string, type: 'success' | 'error') {
 }
 
 export default function ManagerPeladasPage() {
+  const queryClient = useQueryClient();
   const { data: peladas, isLoading: isPeladasLoading } = useQuery<Pelada[]>({
     queryKey: ['my-peladas-as-admin'],
     queryFn: getMyPeladasAsAdmin,
@@ -34,6 +35,48 @@ export default function ManagerPeladasPage() {
   const [confirmationOpenHoursBeforeEvent, setConfirmationOpenHoursBeforeEvent] = useState<number | undefined>(undefined);
   const [confirmationCloseHoursFromEvent, setConfirmationCloseHoursFromEvent] = useState<number | undefined>(undefined);
 
+  useEffect(() => {
+    if (peladas && peladas.length > 0) {
+      setSelectedPelada(peladas[0].id);
+    }
+  }, [peladas]);
+
+  const deletePeladaMutation = useMutation({
+    mutationFn: (idPelada: string) => deletePelada(idPelada),
+    onSuccess: () => {
+      daisyToast('Pelada excluída com sucesso!', 'success');
+      setSelectedPelada(undefined);
+      queryClient.invalidateQueries({ queryKey: ['my-peladas-as-admin'] });
+      queryClient.invalidateQueries({ queryKey: ['my-peladas-as-member'] });
+    },
+    onError: (err) => {
+      const errorMessage = (err as any)?.response?.data?.message || 'Erro ao excluir a pelada.';
+      daisyToast(errorMessage, 'error');
+    }
+  });
+  
+  async function handleDeletePelada() {
+    const confirmed = window.confirm('Tem certeza que deseja excluir esta pelada? Esta ação não pode ser desfeita.');
+    if (!confirmed || !selectedPelada) return;
+    deletePeladaMutation.mutate(selectedPelada);
+  }
+
+  if (isPeladasLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <span className="loading loading-spinner loading-lg text-primary"></span>
+      </div>
+    );
+  }
+
+  if (!peladas || peladas.length === 0) {
+    return (
+      <div className="p-6">
+        <h1 className="text-2xl font-bold mb-4">Gerenciar Peladas</h1>
+        <p className="text-base-content/70">Você ainda não tem nenhuma pelada criada ou não é um administrador em algumaoutra pelada.<br/> Crie uma nova pelada para começar a gerenciar.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-8">
@@ -57,7 +100,9 @@ export default function ManagerPeladasPage() {
       <MembrosList
         selectedPeladaId={selectedPelada}
       />
-
+      <div className='flex justify-center'>
+        <button className='btn btn-error' onClick={handleDeletePelada}>Excluir Pelada</button>
+      </div>
     </div>
   );
 }
@@ -388,6 +433,10 @@ function MembrosList({ selectedPeladaId }: { selectedPeladaId: string | undefine
     retry: false,
   });
 
+  useEffect(() => {
+    console.log(members)
+  }, [members])
+
   return (
     <>
       <div className="bg-base-100 rounded-xl shadow p-4 space-y-4">
@@ -439,21 +488,6 @@ function MembroModal({
   selectedPeladaId: string | undefined;
 }) {
   const queryClient = useQueryClient();
-
-  function confirmarPagamento() {
-    daisyToast(`Pagamento confirmado de ${selectedMember!.user.name}`, 'success');
-    setSelectedMember(undefined);
-  }
-
-  function deixarPendente() {
-    daisyToast(`Pagamento de ${selectedMember!.user.name} marcado como pendente`, 'success');
-    setSelectedMember(undefined);
-  }
-
-  function cancelarPendencia() {
-    daisyToast(`Pendência de pagamento de ${selectedMember!.user.name} cancelada`, 'success');
-    setSelectedMember(undefined);
-  }
 
   const exclude = useMutation({
     mutationFn: (memberId: string): Promise<any> =>
@@ -509,6 +543,71 @@ function MembroModal({
     },
   });
 
+  const paymentPending = useMutation({
+    mutationFn: (memberId: string) => setPaymentPending(selectedPeladaId!, memberId),
+    onSuccess: (res) => {
+      daisyToast(res.message || 'Pagamento marcado como pendente.', 'success');
+      updatePaymentStatus(res.id, 'pending');
+      setSelectedMember(undefined);
+    },
+    onError: (err) => {
+      console.error(err);
+      const errorMessage =
+        (err as any)?.response?.data?.message ||
+        err?.message ||
+        'Erro ao marcar o pagamento como pendente.';
+      daisyToast(errorMessage, 'error');
+    }
+  });
+
+  const cancelPaymentPendingMutate = useMutation({
+    mutationFn: (memberId: string) => cancelPaymentPending(selectedPeladaId!, memberId),
+    onSuccess: (res) => {
+      daisyToast(res.message || 'Pagamento desmarcado como pendente.', 'success');
+      updatePaymentStatus(res.id, 'unpaid');
+      setSelectedMember(undefined);
+    },
+    onError: (err) => {
+      const errorMessage =
+        (err as any)?.response?.data?.message ||
+        err?.message ||
+        'Erro ao desmarcar o pagamento como pendente.';
+      daisyToast(errorMessage, 'error');
+    }
+  });
+
+  const setPaymentPaidMutate = useMutation({
+    mutationFn: (memberId: string) => setPaymentPaid(selectedPeladaId!, memberId),
+    onSuccess: (res) => {
+      daisyToast(res.message || 'Pagamento confirmado.', 'success');
+      updatePaymentStatus(res.id, 'paid');
+      setSelectedMember(undefined);
+    },
+    onError: (err) => {
+      const errorMessage =
+        (err as any)?.response?.data?.message ||
+        err?.message ||
+        'Erro ao confirmar o pagamento.';
+      daisyToast(errorMessage, 'error');
+    }
+  });
+
+
+  function updatePaymentStatus(memberId: string, status: 'paid' | 'pending' | 'unpaid') {
+    queryClient.setQueryData(['members', selectedPeladaId!], (prev: Member[]) =>
+      prev.map((m) => {
+        if (m.id === memberId) {
+          if (m.user.paymentHistories && m.user.paymentHistories[0]) {
+            m.user.paymentHistories[0].status = status;
+          } else {
+            m.user.paymentHistories = [{ status: status, reference_month: '' }];
+          }
+        }
+        return m;
+      })
+    );
+  }
+
   function handleDeleteMember(memberId: string) {
     exclude.mutate(memberId);
     setSelectedMember(undefined);
@@ -533,10 +632,10 @@ function MembroModal({
                 {
                   selectedMember.user.paymentHistories?.[0]?.status === 'pending' ? (
                     <>
-                      <button className="btn btn-success" onClick={confirmarPagamento}>
+                      <button className="btn btn-success" onClick={() => setPaymentPaidMutate.mutate(selectedMember.id)}>
                         Confirmar Pagamento
                       </button>
-                      <button className="btn btn-outline" onClick={cancelarPendencia}>
+                      <button className="btn btn-outline" onClick={() => cancelPaymentPendingMutate.mutate(selectedMember.id)}>
                         Cancelar Pendência
                       </button>
                     </>
@@ -544,10 +643,10 @@ function MembroModal({
                     <p className="text-sm text-base-content/70">Pagamento confirmado</p>
                   ) : (
                     <>
-                      <button className="btn btn-success" onClick={confirmarPagamento}>
+                      <button className="btn btn-success" onClick={() => setPaymentPaidMutate.mutate(selectedMember.id)}>
                         Confirmar Pagamento
                       </button>
-                      <button className="btn btn-warning" onClick={deixarPendente}>
+                      <button className="btn btn-warning" onClick={() => paymentPending.mutate(selectedMember.id)}>
                         Deixar como Pendente
                       </button>
                     </>

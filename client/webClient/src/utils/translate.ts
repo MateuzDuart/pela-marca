@@ -31,3 +31,16 @@ export function translateRole(role: string) {
       return '';
   }
 }
+
+export function translatePaymentStatus(status: string) {
+  switch (status) {
+    case 'paid':
+      return 'Pago';
+    case 'pending':
+      return 'Pendente';
+    case 'late':
+      return 'Atrasado';
+    default:
+      return '';
+  }
+}

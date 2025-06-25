@@ -38,4 +38,10 @@ PaymentHistoriesSchema.init({
 }, {
   sequelize,
   tableName: "payment_histories",
+  indexes: [
+    {
+      unique: true,
+      fields: ['user_id', 'reference_month', "pelada_id"]
+    }
+  ]
 });

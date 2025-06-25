@@ -26,6 +26,7 @@ const PORT = process.env.PORT || 3000;
 const allowedOrigins = [
   'https://pelamarca.com',
   'https://www.pelamarca.com',
+  "http://localhost:5173",
 ];
 app.use(helmet());
 app.use(cors({

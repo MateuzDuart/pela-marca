@@ -1,11 +1,14 @@
 // models/EventConfirmation.ts
 import { DataTypes, Model } from "sequelize";
 import { sequelize } from "../database";
+import { MembersSchema } from "./MembersSchema";
 
 export class EventConfirmationsSchema extends Model {
   public id!: number;
   public event_id!: string;
   public member_id!: string;
+
+  readonly member?: MembersSchema;
 }
 
 EventConfirmationsSchema.init({

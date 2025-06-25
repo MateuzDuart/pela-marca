@@ -1,61 +1,159 @@
 import { useParams } from 'react-router-dom';
-import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { cancelConfirmAttendance, confirmAttendance, getPeladaData } from '../../API/routes';
+import { getNextWeekday } from '../../utils/getNextWeekDay';
+import type { PeladaPageDTO } from '../../DTO/PeladaPageDTO';
+import { useUser } from '../../context/userContext';
+import { useEffect, useState } from 'react';
+import { translatePaymentStatus, translateWeekDays } from '../../utils/translate';
+import toast from 'react-hot-toast';
 
 export default function PeladaPage() {
   const { id } = useParams();
+  const { user } = useUser();
+  const queryClient = useQueryClient();
 
-  // Simulação de evento da semana
-  const eventoAtivo = true;
-  const dataEvento = '2025-06-13'; // ou undefined se não tiver evento
+  const [isUserConfirmed, setConfirmados] = useState(false);
+  const [isEventActive, setEventActive] = useState(false);
+  const [nextPeladaDate, setNextPeladaDate] = useState<Date | null>(null);
 
-  const [confirmados, setConfirmados] = useState<number[]>([1, 3]);
-  const membros = [
-    { id: 1, nome: 'João', avatar: 'https://i.pravatar.cc/100?img=1', status: 'Em dia', pagamento: '2025-06-10' },
-    { id: 2, nome: 'Maria', avatar: 'https://i.pravatar.cc/100?img=2', status: 'Devendo', pagamento: '2025-05-05' },
-    { id: 3, nome: 'Carlos', avatar: 'https://i.pravatar.cc/100?img=3', status: 'Em dia', pagamento: '2025-06-08' },
-  ];
+  const { data: peladaData, isLoading, isError, error } = useQuery({
+    queryKey: ['pelada', id],
+    queryFn: () => getPeladaData(id!),
+    enabled: !!id,
+    retry: false,
+  });
 
-  const usuarioLogado = membros[0];
-  const confirmou = confirmados.includes(usuarioLogado.id);
+  const confirmAttendanceMutation = useMutation({
+    mutationFn: confirmAttendance,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pelada', id!] });
+      setConfirmados(true);
+      toast.success('Confirmado com sucesso!');
+    },
+    onError: (error: any) => {
+      toast.error(error.response.data.message || 'Erro ao confirmar presença.');
+    },
+  });
 
-  const handleConfirmarPresenca = () => {
-    if (!confirmou) setConfirmados((prev) => [...prev, usuarioLogado.id]);
+  const cancelAttendanceMutation = useMutation({
+    mutationFn: cancelConfirmAttendance,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pelada', id!] });
+      setConfirmados(false);
+      toast.success('Cancelado com sucesso!');
+    },
+    onError: (error: any) => {
+      toast.error(error.response.data.message || 'Erro ao cancelar presença.');
+    },
+  });
+
+
+  useEffect(() => {
+    function isUserConfirmed(data: PeladaPageDTO): boolean {
+      const userFound = data.attendance_list.find((userFromList) => userFromList.id === user?.id)
+      return !!userFound;
+    }
+
+    function isEventActive(eventDay: Date, confirmationOpenHours: number, confirmationCloseHours: number) {
+      const now = new Date();
+      const eventDate = new Date(eventDay);
+      const openDate = new Date(eventDate.getTime() - confirmationOpenHours * 60 * 60 * 1000);
+      const closeDate = new Date(eventDate.getTime() + confirmationCloseHours * 60 * 60 * 1000);
+      return now >= openDate && now <= closeDate;
+    }
+
+    if (peladaData) {
+      setConfirmados(isUserConfirmed(peladaData));
+
+      if (peladaData.schedule.length > 0) {
+        const nextEventDate = getNextWeekday(peladaData.schedule[0].day, peladaData.schedule[0].hour);
+        setNextPeladaDate(nextEventDate);
+        const eventActive = isEventActive(nextEventDate, peladaData.confirmation_open_hours_before_event, peladaData.confirmation_close_hours_from_event);
+        setEventActive(eventActive);
+      }
+    }
+  }, [peladaData, user]);
+
+
+
+  function getPaymentBadge(data: PeladaPageDTO) {
+    let paymentStatus = ""
+
+    if (data.payment_status === "paid") {
+      paymentStatus = "badge-success";
+    } else if (data.payment_status === "pending") {
+      paymentStatus = "badge-warning";
+    } else if (data.payment_status === "late") {
+      paymentStatus = "badge-error";
+    }
+
+    return (
+      <span className={`badge ${paymentStatus}`}>
+        {translatePaymentStatus(data.payment_status)}
+      </span>
+    )
+  }
+
+  function getDateOfOpeningConfirmation(confirmationOpenHours: number): string {
+    if (!nextPeladaDate) {
+      return "Data não disponível";
+    }
+    return new Date(nextPeladaDate.getTime() - confirmationOpenHours * 60 * 60 * 1000)
+      .toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  }
+
+  const formatData = (date: Date) => {
+    return date.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   };
 
-  const diasFrequentes = ['Segunda-feira', 'Quinta-feira'];
+  if (isLoading) {
+    return <div className="text-center p-4">Carregando...</div>;
+  }
 
-  const formatData = (data: string) => {
-    return new Date(data).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' });
-  };
+  if (isError) {
+    return <div className="text-center p-4">{(error as any).response?.data.message || "Erro ao carregar a pelada."}</div>;
+  }
 
   return (
     <div className="min-h-screen bg-base-200 p-4 space-y-8">
       {/* Cabeçalho */}
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-primary">Pelada #{id}</h1>
-        <p className="text-base-content">{eventoAtivo ? `Evento em: ${formatData(dataEvento)}` : 'Nenhum evento ativo'}</p>
+        <h1 className="text-3xl font-bold text-primary">{peladaData?.name.toUpperCase()}</h1>
+        <p className="text-base-content">{peladaData?.schedule[0]?.day ? `Data do evento atual: ${nextPeladaDate ? formatData(nextPeladaDate!) : ''}` : 'Nenhum evento ativo'}</p>
       </div>
+
+      {
+        !isEventActive && (
+          <div className="text-center">
+            <p className="text-base-content/70">
+              A lista de presença vai está disponível para confirmação {peladaData?.confirmation_open_hours_before_event} horas antes do evento.<br />
+              Ás {getDateOfOpeningConfirmation(peladaData?.confirmation_open_hours_before_event!)}
+            </p>
+          </div>
+        )
+      }
+
+
 
       {/* Sessão 1: Presença */}
       <section className="bg-base-100 rounded-xl shadow-md p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">Lista de Presença</h2>
           <span className="badge badge-primary text-white">
-            {confirmados.length} Confirmados
+            {peladaData?.attendance_list.length} Confirmados
           </span>
         </div>
 
-        {eventoAtivo ? (
+        {isEventActive ? (
           <>
-            {!confirmou ? (
-              <button onClick={handleConfirmarPresenca} className="btn btn-success btn-block">
+            {!isUserConfirmed ? (
+              <button onClick={() => confirmAttendanceMutation.mutate(id!)} className="btn btn-success btn-block">
                 Confirmar Presença
               </button>
             ) : (
               <button
-                onClick={() =>
-                  setConfirmados((prev) => prev.filter((id) => id !== usuarioLogado.id))
-                }
+                onClick={() => cancelAttendanceMutation.mutate(id!)}
                 className="btn btn-warning btn-block"
               >
                 Cancelar Confirmação
@@ -63,18 +161,19 @@ export default function PeladaPage() {
             )}
 
             <ul className="space-y-2">
-              {membros
-                .filter((m) => confirmados.includes(m.id))
-                .map((m) => (
-                  <li key={m.id} className="flex items-center gap-3 p-2 rounded bg-success/20">
-                    <div className="avatar">
-                      <div className="w-10 rounded-full">
-                        <img src={m.avatar} />
+              {
+                peladaData?.attendance_list
+                  .map((m) => (
+                    <li key={m.id} className="flex items-center gap-3 p-2 rounded bg-success/20">
+                      <div className="avatar">
+                        <div className="w-10 rounded-full">
+                          <img src={m.picture} />
+                        </div>
                       </div>
-                    </div>
-                    <span>{m.nome}</span>
-                  </li>
-                ))}
+                      <span>{m.name}</span>
+                    </li>
+                  ))
+              }
             </ul>
           </>
         ) : (
@@ -87,24 +186,23 @@ export default function PeladaPage() {
         <h2 className="text-xl font-semibold">Seu Status</h2>
         <p>
           <strong>Status:</strong>{' '}
-          <span className={`badge ${usuarioLogado.status === 'Em dia' ? 'badge-success' : 'badge-error'}`}>
-            {usuarioLogado.status}
-          </span>
+          {
+            getPaymentBadge(peladaData!)
+          }
         </p>
-        <p>
-          <strong>Último Pagamento:</strong> {formatData(usuarioLogado.pagamento)}
-        </p>
+        {/* <p>
+          <strong>Último Pagamento:</strong>
+        </p> */}
       </section>
 
       {/* Sessão 3: Próximos Eventos */}
       <section className="bg-base-100 rounded-xl shadow-md p-6 space-y-3">
         <h2 className="text-xl font-semibold">Próximos Eventos</h2>
-        {diasFrequentes.map((dia, i) => (
+        {peladaData?.schedule.map((date, i) => (
           <div key={i} className="flex justify-between border-b py-2">
-            <span>{dia}</span>
+            <span>{translateWeekDays(date.day)}</span>
             <span className="text-sm text-base-content/70">
-              {/* Simulando a data futura baseada em hoje */}
-              {formatData(new Date(Date.now() + (i + 2) * 86400000).toISOString())}
+              {formatData(getNextWeekday(date.day, date.hour))}
             </span>
           </div>
         ))}
@@ -114,21 +212,21 @@ export default function PeladaPage() {
       <section className="bg-base-100 rounded-xl shadow-md p-6 space-y-3">
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-xl font-semibold">Membros</h2>
-          <span className="badge badge-outline">{membros.length} membros</span>
+          <span className="badge badge-outline">{peladaData?.members_list.length} membros</span>
         </div>
         <ul className="space-y-3">
-          {membros.map((m) => (
-            <li key={m.id} className="flex items-center gap-4">
+          {peladaData?.members_list.map((m, i) => (
+            <li key={i} className="flex items-center gap-4">
               <div className="avatar">
                 <div className="w-10 rounded-full">
-                  <img src={m.avatar} />
+                  <img src={m.picture} />
                 </div>
               </div>
-              <span>{m.nome}</span>
+              <span>{m.name}</span>
             </li>
           ))}
         </ul>
       </section>
-    </div>
+    </div >
   );
 }

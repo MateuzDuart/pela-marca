@@ -1,10 +1,12 @@
 import type { PeladaInviteDTO } from "../DTO/PeladaInviteDTO";
+import type { PeladaPageDTO } from "../DTO/PeladaPageDTO";
 import type { updatePeladaInformations } from "../DTO/updatePeladaInformations";
 import type { Invite } from "../modules/Invite";
 import type { Member } from "../modules/Member";
 import type Pelada from "../modules/Pelada";
 import type { DaysOfTheWeek, schedule } from "../modules/schedule";
 import type User from "../modules/User";
+import { getMouthReference } from "../utils/getMouthReference";
 import { Instance } from "./instance";
 
 const base = "/api/v1"
@@ -13,6 +15,7 @@ export async function getUserdata(): Promise<User> {
   const res = (await Instance.get(base + "/user")).data
 
   return {
+    id: res.id,
     name: res.name,
     email: res.email,
     picture: res.picture
@@ -54,13 +57,35 @@ export async function getMyPeladasAsAdmin(): Promise<Pelada[]> {
 }
 
 export async function createPelada(data: { name: string, schedule: schedule, paymentDay: number, price: number }): Promise<{ message: string }> {
-  const res = (await Instance.post(base + "/pelada", data)).data;
+  const formatedSchedule = {} as Record<DaysOfTheWeek, { hour: string, is_active: boolean }>;
+  
+  for (const day in data.schedule) {
+    const dayData = data.schedule[day as DaysOfTheWeek];
+    if (dayData.hour === "") { continue }
+
+    formatedSchedule[day as DaysOfTheWeek] = {
+      hour: dayData.hour,
+      is_active: dayData.isActive
+    };
+  }
+  const res = (await Instance.post(base + "/pelada", {
+    name: data.name,
+    schedule: formatedSchedule,
+    payment_day: data.paymentDay,
+    price: data.price
+  })).data;
 
   return res
 }
 
 export async function getMembersAsAdmin(peladaId: string): Promise<Array<Member>> {
   const res = (await Instance.get(base + `/members-as-admin/${peladaId}`)).data
+
+  return res
+}
+
+export async function getMembers(peladaId: string): Promise<Array<Member>> {
+  const res = (await Instance.get(base + `/members/${peladaId}`)).data
 
   return res
 }
@@ -165,4 +190,51 @@ export async function removeAdminRole(peladaId: string, memberId: string): Promi
   const res = (await Instance.patch(base + `/remove-member-role/${peladaId}`, { member_id: memberId })).data;
 
   return { message: res.message, id: memberId }
+}
+
+export async function setPaymentPending(peladaId: string, memberId: string): Promise<{ message: string, id: string }> {
+  const mouthReference =getMouthReference();
+  const res = (await Instance.patch(base + `/payments/${peladaId}/pending`, { member_id: memberId, mouth_reference: mouthReference })).data;
+
+  return { message: res.message, id: memberId }
+}
+
+export async function cancelPaymentPending(peladaId: string, memberId: string): Promise<{ message: string, id: string }> {
+  const mouthReference =getMouthReference();
+
+  const res = (await Instance.patch(base + `/payments/${peladaId}/cancel-pending`, { member_id: memberId, mouth_reference: mouthReference })).data;
+
+  return { message: res.message, id: memberId }
+}
+
+export async function setPaymentPaid(peladaId: string, memberId: string): Promise<{ message: string, id: string }> {
+  const mouthReference =getMouthReference();
+
+  const res = (await Instance.patch(base + `/payments/${peladaId}/paid`, { member_id: memberId, mouth_reference: mouthReference })).data;
+
+  return { message: res.message, id: memberId }
+}
+
+export async function deletePelada(peladaId: string): Promise<{ message: string }> {
+  const res = (await Instance.delete(base + `/pelada/${peladaId}`)).data;
+
+  return { message: res.message}
+}
+
+export async function getPeladaData(peladaId: string): Promise<PeladaPageDTO> {
+  const res = (await Instance.get(base + `/pelada/${peladaId}`)).data;
+
+  return res
+}
+
+export async function confirmAttendance(peladaId: string): Promise<{ message: string }> {
+  const res = (await Instance.patch(base + `/pelada/${peladaId}/confirm-attendance`)).data;
+
+  return { message: res.message }
+}
+
+export async function cancelConfirmAttendance(peladaId: string): Promise<{ message: string }> {
+  const res = (await Instance.patch(base + `/pelada/${peladaId}/cancel-attendance`)).data;
+
+  return { message: res.message }
 }
