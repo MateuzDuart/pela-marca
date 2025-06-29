@@ -23,6 +23,9 @@ import { PaymentDTO } from "../DTO/paymentDTO";
 import { EventsSchema } from "../database/models/EventsSchema";
 import { EventConfirmationsSchema } from "../database/models/EventConfirmationSchema";
 import { stat } from "fs";
+import { checkIfOpen } from "../utils/checkIfOpen";
+import { getNextAvailableDay } from "../utils/getNextAvailableDay";
+import { getNextWeekday } from "../utils/getNextWeekDay";
 
 export default new class PeladaService {
   // CREATE
@@ -75,7 +78,7 @@ export default new class PeladaService {
     if (!user) throw new PeladaServiceError("Usuário não encontrado");
 
     const invite = await GuestsSchema.findOne({ where: { user_id: data.userId, pelada_id: data.peladaId }, transaction });
-    if (invite) throw new PeladaServiceError("Convite ja foi enviado");
+    if (invite) throw new PeladaServiceError("Convite já foi enviado");
 
     await GuestsSchema.create({ user_id: data.userId, pelada_id: data.peladaId }, { transaction });
 
@@ -150,7 +153,7 @@ export default new class PeladaService {
           as: "schedule",
           attributes: ["day", "hour", "is_active"],
           where: {
-            hour: { [Op.not]: "00:00:00" }
+            hour: { [Op.not]: null }
           },
           required: false
         }
@@ -169,7 +172,18 @@ export default new class PeladaService {
         {
           model: PeladasSchema,
           as: "pelada",
-          attributes: ["id", "name"],
+          attributes: ["id", "name", "payment_day", "confirmation_open_hours_before_event", "confirmation_close_hours_from_event"],
+          include: [
+            {
+              model: EventDaysSchema,
+              as: "schedule",
+              attributes: ["day", "hour"],
+              where: {
+                is_active: true
+              },
+              required: false
+            }
+          ]
         },
       ],
     })
@@ -600,7 +614,7 @@ export default new class PeladaService {
     const paymentHistory = memberToUpdate.user?.paymentHistories?.[0];
     if (paymentHistory) {
       if (paymentHistory.status === "pending") return { message: "Pagamento já está pendente" };
-      if (paymentHistory.status === "paid") return { message: "Pagamento ja foi efetuado" };
+      if (paymentHistory.status === "paid") return { message: "Pagamento já foi efetuado" };
 
       paymentHistory.status = "pending";
       await paymentHistory.save({ transaction });
@@ -743,11 +757,28 @@ export default new class PeladaService {
     if (!member) throw new PeladaServiceError("Usuário não tem permissão para confirmar presença no evento");
 
     const pelada = await PeladasSchema.findByPk(peladaId, {
+      attributes: ["id", "confirmation_open_hours_before_event", "confirmation_close_hours_from_event"],
       include: [
         {
           model: EventsSchema,
           as: "events",
           attributes: ["id", "status"],
+          include: [
+            {
+              model: EventConfirmationsSchema,
+              as: "confirmations",
+              attributes: ["id"],
+              where: { member_id: member.id },
+              required: false
+            }
+          ]
+        },
+        {
+          model: EventDaysSchema,
+          as: "schedule",
+          attributes: ["day"],
+          where: { is_active: true },
+          required: false
         }
       ]
     });
@@ -755,6 +786,17 @@ export default new class PeladaService {
 
     const event = pelada.events?.[0];
     if (!event) {
+      const schedule = pelada.schedule;
+      if (!schedule) { throw new PeladaServiceError("Agendamento não encontrado") };
+
+      const nextAvailableDayName = getNextAvailableDay(schedule.map(day => day.day));
+      const nextAvailableDay = schedule.find(day => day.day === nextAvailableDayName);
+      if (!nextAvailableDay) { throw new PeladaServiceError("Agendamento não encontrado_") };
+
+      const nextDate = getNextWeekday(nextAvailableDay.day, nextAvailableDay.hour || undefined);
+      const isEventOpen = checkIfOpen(nextDate, pelada.confirmation_open_hours_before_event!, pelada.confirmation_close_hours_from_event!);
+      if (!isEventOpen) throw new PeladaServiceError("Evento está fechado para confirmações");
+
       const event = await EventsSchema.create({
         pelada_id: peladaId,
         status: "open",
@@ -769,6 +811,7 @@ export default new class PeladaService {
     } else if (event.status === "cancelled") {
       throw new PeladaServiceError("Evento foi cancelado");
     } else {
+      if (event.confirmations?.length) throw new PeladaServiceError("Você já confirmou presenca neste evento");
       await EventConfirmationsSchema.create({
         member_id: member.id,
         event_id: event.id,

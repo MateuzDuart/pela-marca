@@ -24,7 +24,7 @@ function RootLayout() {
             <div className="flex flex-col min-h-screen">
               <Navbar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
               <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-              <main className="flex-grow p-4 bg-base-200">
+              <main>
                 <App />
               </main>
               <Footer />

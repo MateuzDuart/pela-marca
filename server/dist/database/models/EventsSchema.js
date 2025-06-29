@@ -19,7 +19,7 @@ EventsSchema.init({
     },
     date: {
         type: sequelize_1.DataTypes.DATEONLY,
-        allowNull: false,
+        allowNull: true,
     },
     status: {
         type: sequelize_1.DataTypes.ENUM("open", "closed", "cancelled"),

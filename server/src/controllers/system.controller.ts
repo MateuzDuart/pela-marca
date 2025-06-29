@@ -38,13 +38,11 @@ export default new class SystemController {
       });
     }
 
-    const isGooglePicute = user.picture?.startsWith('https://lh3.googleusercontent.com/a/');
-
     return res.status(200).send({
       id: user.id,
       name: user.name,
       email: user.email,
-      picture: isGooglePicute ? user.picture : `${process.env.BASE_URL}/images/${user.picture}`,
+      picture: user.picture,
     });
   }
 
@@ -113,18 +111,17 @@ export default new class SystemController {
     }
   }
 
-
   // tudo para baixo já está usando services
   async createPelada(req: Request, res: Response): Promise<any> {
     const userId = (req as any).userId;
-    const schedule: Record<Eschedule, { hour: string, isActive?: boolean }> = {
-      monday: { hour: "00:00" },
-      tuesday: { hour: "00:00" },
-      wednesday: { hour: "00:00" },
-      thursday: { hour: "00:00" },
-      friday: { hour: "00:00" },
-      saturday: { hour: "00:00" },
-      sunday: { hour: "00:00" },
+    const schedule: Record<Eschedule, { hour: string | null, isActive?: boolean }> = {
+      monday: { hour: null },
+      tuesday: { hour: null },
+      wednesday: { hour: null },
+      thursday: { hour: null },
+      friday: { hour: null },
+      saturday: { hour: null },
+      sunday: { hour: null },
     }
 
     const transaction = await sequelize.transaction();
@@ -148,6 +145,7 @@ export default new class SystemController {
       await transaction.commit();
       return res.status(201).json({
         message: "Pelada criada com sucesso",
+        id: pelada.id
       });
     } catch (err) {
       await transaction.rollback();
@@ -655,6 +653,7 @@ export default new class SystemController {
       if (error instanceof ZodError) {
         return res.status(400).send(error)
       }
+      
       if (error instanceof PeladaServiceError) {
         return res.status(400).json({
           message: error instanceof Error ? error.message : "Erro ao confirmar presença no evento",

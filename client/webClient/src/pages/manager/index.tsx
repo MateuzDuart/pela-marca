@@ -9,34 +9,47 @@ import { DaysOfTheWeek, type schedule } from '../../modules/schedule';
 import type { Member } from '../../modules/Member';
 import type { Invite } from '../../modules/Invite';
 import { translateWeekDays } from '../../utils/translate';
+import { useNavigate } from 'react-router-dom';
+import { API_URL } from '../../config';
+import { useSearchParams } from 'react-router-dom';
 
 const defaultSchedule: schedule = Object.values(DaysOfTheWeek).reduce((acc, day) => {
   acc[day] = { hour: '', isActive: false };
   return acc;
 }, {} as schedule);
 function daisyToast(message: string, type: 'success' | 'error') {
-  toast.custom(
-    <div className={`alert alert-${type} shadow-lg`}>
-      <span>{message}</span>
-    </div>,
-    { duration: 3000 }
-  );
+  if (type === 'success') {
+    toast.success(message, { duration: 3000 });
+  } else {
+    toast.error(message, { duration: 3000 });
+  }
 }
 
 export default function ManagerPeladasPage() {
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const id = searchParams.get('id');
+
   const { data: peladas, isLoading: isPeladasLoading } = useQuery<Pelada[]>({
     queryKey: ['my-peladas-as-admin'],
     queryFn: getMyPeladasAsAdmin,
     retry: false,
   })
 
-  const [selectedPelada, setSelectedPelada] = useState<string | undefined>(undefined);
+  const [selectedPelada, setSelectedPelada] = useState<string | undefined>(id || undefined);
   const [confirmationOpenHoursBeforeEvent, setConfirmationOpenHoursBeforeEvent] = useState<number | undefined>(undefined);
   const [confirmationCloseHoursFromEvent, setConfirmationCloseHoursFromEvent] = useState<number | undefined>(undefined);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (peladas && peladas.length > 0) {
+      if (id) {
+        const pelada = peladas.find((pelada) => pelada.id === id);
+        if (pelada) {
+          setSelectedPelada(pelada.id);
+          return
+        }
+      }
       setSelectedPelada(peladas[0].id);
     }
   }, [peladas]);
@@ -54,7 +67,7 @@ export default function ManagerPeladasPage() {
       daisyToast(errorMessage, 'error');
     }
   });
-  
+
   async function handleDeletePelada() {
     const confirmed = window.confirm('Tem certeza que deseja excluir esta pelada? Esta ação não pode ser desfeita.');
     if (!confirmed || !selectedPelada) return;
@@ -73,7 +86,10 @@ export default function ManagerPeladasPage() {
     return (
       <div className="p-6">
         <h1 className="text-2xl font-bold mb-4">Gerenciar Peladas</h1>
-        <p className="text-base-content/70">Você ainda não tem nenhuma pelada criada ou não é um administrador em algumaoutra pelada.<br/> Crie uma nova pelada para começar a gerenciar.</p>
+        <p className="text-base-content/70">Você ainda não tem nenhuma pelada criada ou não é um administrador em algumaoutra pelada.<br /> Crie uma nova pelada para começar a gerenciar.</p>
+        <button className="btn btn-primary mt-4" onClick={() => navigate('/pelada/criar')}>
+          Criar Pelada
+        </button>
       </div>
     );
   }
@@ -114,12 +130,6 @@ function SelectPelada({ selectedPelada, setSelectedPelada, peladas, isPeladasLoa
   isPeladasLoading: boolean
 }) {
 
-  useEffect(() => {
-    if (!isPeladasLoading) {
-      setSelectedPelada(peladas?.[0]?.id)
-    }
-  }, [isPeladasLoading])
-
   return (
     <div className="form-control">
       <label className="label"><span className="label-text">Selecione uma pelada</span></label>
@@ -150,6 +160,9 @@ function ConviteLink({ selectedPeladaId }: { selectedPeladaId: string | undefine
     daisyToast('Link copiado!', 'success');
   };
 
+  useEffect(() => {
+    console.log(selectedPeladaId);
+  }, [selectedPeladaId]);
   return (
     <div className="bg-base-100 p-4 rounded-lg shadow space-y-2">
       <h2 className="text-lg font-semibold">Convidar Pessoas</h2>
@@ -403,7 +416,17 @@ function ConvitesList({ selectedPeladaId }: { selectedPeladaId: string | undefin
               invites?.map((invite) => (
                 <li key={invite.id} className="flex flex-wrap items-center justify-between py-3 gap-2">
                   <div className='flex gap-2'>
-                    <div className="avatar"><div className="w-10 rounded-full"><img src={invite.user.picture} /></div></div>
+                    <div className="avatar">
+                      <div className="w-10 rounded-full">
+                        <img src={invite.user.picture ? `${API_URL}/images/${invite.user.picture}` : '/default_user.png'}
+                          alt="avatar"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null; // evita loop infinito
+                            e.currentTarget.src = '/default_user.png'; // ou alguma URL pública válida
+                          }}
+                        />
+                      </div>
+                    </div>
                     <div>
                       <p className="font-medium">{invite.user.name}</p>
                       <p className="text-sm text-base-content/70">{invite.user.email}</p>
@@ -433,10 +456,6 @@ function MembrosList({ selectedPeladaId }: { selectedPeladaId: string | undefine
     retry: false,
   });
 
-  useEffect(() => {
-    console.log(members)
-  }, [members])
-
   return (
     <>
       <div className="bg-base-100 rounded-xl shadow p-4 space-y-4">
@@ -453,7 +472,17 @@ function MembrosList({ selectedPeladaId }: { selectedPeladaId: string | undefine
                 className="flex items-center gap-4 p-3 hover:bg-base-200 cursor-pointer"
                 onClick={() => setSelectedMember(m)}
               >
-                <div className="avatar"><div className="w-10 rounded-full"><img src={m.user.picture} /></div></div>
+                <div className="avatar">
+                  <div className="w-10 rounded-full">
+                    <img src={m.user.picture ? `${API_URL}/images/${m.user.picture}` : '/default_user.png'}
+                      alt="avatar"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null; // evita loop infinito
+                        e.currentTarget.src = '/default_user.png'; // ou alguma URL pública válida
+                      }}
+                    />
+                  </div>
+                </div>
                 <div className="flex-1"><p>{m.user.name}</p></div>
                 {
                   m.user.paymentHistories?.[0]?.status === 'pending' ? (
@@ -620,7 +649,13 @@ function MembroModal({
           <div className="flex flex-col items-center gap-4">
             <div className="avatar">
               <div className="w-20 rounded-full">
-                <img src={selectedMember.user.picture} />
+                <img src={selectedMember.user.picture ? `${API_URL}/images/${selectedMember.user.picture}` : '/default_user.png'}
+                  alt="avatar"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null; // evita loop infinito
+                    e.currentTarget.src = '/default_user.png'; // ou alguma URL pública válida
+                  }}
+                />
               </div>
             </div>
             <p className="text-xl font-semibold">{selectedMember.user.name}</p>

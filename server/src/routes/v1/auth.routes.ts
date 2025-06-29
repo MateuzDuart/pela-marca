@@ -8,5 +8,7 @@ authRouter.get("/auth/google/callback", authController.handleGoogleCallback); //
 
 authRouter.post("/auth/google", authController.generateToken); // mantém caso use o fluxo via idToken
 authRouter.get("/auth/google/validate", authController.validateToken);
+authRouter.post("/logout",  authController.logout);
+
 
 export default authRouter;

@@ -5,6 +5,7 @@ import { getPeladaInviteData, sendInvite } from '../../API/routes';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import type { PeladaInviteDTO } from '../../DTO/PeladaInviteDTO';
 import toast from 'react-hot-toast';
+import { API_URL } from '../../config';
 
 export default function InvitePage() {
   const { id: peladaId } = useParams<{ id: string }>();
@@ -124,11 +125,14 @@ export default function InvitePage() {
         <div className="space-y-3">
           {pelada.members.map((member, idx) => (
             <div key={idx} className="flex items-center space-x-4">
-              <img
-                src={member.user.picture}
-                alt={member.user.name}
-                className="w-12 h-12 rounded-full object-cover"
-              />
+              <img src={member.user.picture ? `${API_URL}/images/${member.user.picture}` : '/default_user.png'}
+                    alt="avatar"
+                    className="w-12 h-12 rounded-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null; // evita loop infinito
+                      e.currentTarget.src = '/default_user.png'; // ou alguma URL pública válida
+                    }}
+                  />
               <div>
                 <p className="font-semibold">{member.user.name}</p>
                 <p className="text-sm text-gray-500">{translateRole(member.role)}</p>

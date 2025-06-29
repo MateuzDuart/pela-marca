@@ -1,0 +1,29 @@
+- oque tenho:
+	landing page
+	Registro / login de usuários pelo google
+	Painel do usuário:
+		total de peladas que ele é admin
+		total de peladas que ele participa
+		cards das peladas que ele participa
+	Criar pelada
+	Editar Perfil
+	Gerenciar peladas:
+		convite
+		editar agenda
+		editar dados de pagamento
+		editar dados de abertura e fechamento de confirmação
+		opção de aceitar ou recusar convite
+		Gerenciamento de pagamento de membros
+		gerenciamento de administradores
+	Página de convite
+	
+	
+	
+		
+oque eu quero:
+	
+problemas:
+	está sendo possível confirmar presença em eventos fechados
+
+	
+	

@@ -36,8 +36,6 @@ export default function CreatePeladaPage() {
       }
     }
 
-    console.log(paymentDay);
-
     createPelada({
       name,
       schedule: activeSchedule,
@@ -48,7 +46,7 @@ export default function CreatePeladaPage() {
         toast.success(res.message);
         queryClient.invalidateQueries({ queryKey: ['my-peladas-as-member'] });
         
-        navigate('/');
+        navigate('/peladas?id=' + res.id);
       })
       .catch((err) => {
         toast.error(err.response.data.message || 'Erro ao criar a pelada.');

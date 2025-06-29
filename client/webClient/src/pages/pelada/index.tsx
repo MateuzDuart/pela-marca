@@ -7,6 +7,8 @@ import { useUser } from '../../context/userContext';
 import { useEffect, useState } from 'react';
 import { translatePaymentStatus, translateWeekDays } from '../../utils/translate';
 import toast from 'react-hot-toast';
+import { getNextAvailableDay } from '../../utils/getNextAvailableDay';
+import { API_URL } from '../../config';
 
 export default function PeladaPage() {
   const { id } = useParams();
@@ -67,7 +69,14 @@ export default function PeladaPage() {
       setConfirmados(isUserConfirmed(peladaData));
 
       if (peladaData.schedule.length > 0) {
-        const nextEventDate = getNextWeekday(peladaData.schedule[0].day, peladaData.schedule[0].hour);
+        const nextAvailableDayName = getNextAvailableDay(peladaData.schedule.map(day => day.day))
+        const nextAvailableDay = peladaData.schedule.find(day => day.day === nextAvailableDayName);
+        if (!nextAvailableDay) {
+          setNextPeladaDate(null);
+          setEventActive(false);
+          return;
+        }
+        const nextEventDate = getNextWeekday(nextAvailableDay.day, nextAvailableDay.hour);
         setNextPeladaDate(nextEventDate);
         const eventActive = isEventActive(nextEventDate, peladaData.confirmation_open_hours_before_event, peladaData.confirmation_close_hours_from_event);
         setEventActive(eventActive);
@@ -167,7 +176,13 @@ export default function PeladaPage() {
                     <li key={m.id} className="flex items-center gap-3 p-2 rounded bg-success/20">
                       <div className="avatar">
                         <div className="w-10 rounded-full">
-                          <img src={m.picture} />
+                          <img src={m.picture ? `${API_URL}/images/${m.picture}` : '/default_user.png'}
+                            alt="avatar"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null; // evita loop infinito
+                              e.currentTarget.src = '/default_user.png'; // ou alguma URL pública válida
+                            }}
+                          />
                         </div>
                       </div>
                       <span>{m.name}</span>
@@ -219,7 +234,13 @@ export default function PeladaPage() {
             <li key={i} className="flex items-center gap-4">
               <div className="avatar">
                 <div className="w-10 rounded-full">
-                  <img src={m.picture} />
+                  <img src={m.picture ? `${API_URL}/images/${m.picture}` : '/default_user.png'}
+                      alt="avatar"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null; // evita loop infinito
+                        e.currentTarget.src = '/default_user.png'; // ou alguma URL pública válida
+                      }}
+                    />
                 </div>
               </div>
               <span>{m.name}</span>

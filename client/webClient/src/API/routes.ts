@@ -38,12 +38,16 @@ export async function updateUser(nome: string, picture: File | null): Promise<vo
   });
 }
 
-export async function getMyPeladas(): Promise<Pelada[]> {
+export async function getMyPeladas(): Promise<{ id: string, name: string, paymentDay: string, confirmationOpenHoursBeforeEvent: number, confirmationCloseHoursFromEvent: number, schedule: Array<{ day: DaysOfTheWeek, hour: string }> }[]> {
   const data = (await Instance.get(base + "/my-peladas")).data
 
   return data.map((pelada: any) => ({
     id: pelada.id,
     name: pelada.name,
+    paymentDay: pelada.payment_day,
+    confirmationOpenHoursBeforeEvent: pelada.confirmation_open_hours_before_event,
+    confirmationCloseHoursFromEvent: pelada.confirmation_close_hours_from_event,
+    schedule: pelada.schedule
   }));
 }
 
@@ -56,7 +60,7 @@ export async function getMyPeladasAsAdmin(): Promise<Pelada[]> {
   }));
 }
 
-export async function createPelada(data: { name: string, schedule: schedule, paymentDay: number, price: number }): Promise<{ message: string }> {
+export async function createPelada(data: { name: string, schedule: schedule, paymentDay: number, price: number }): Promise<{ message: string, id: string }> {
   const formatedSchedule = {} as Record<DaysOfTheWeek, { hour: string, is_active: boolean }>;
   
   for (const day in data.schedule) {
@@ -237,4 +241,8 @@ export async function cancelConfirmAttendance(peladaId: string): Promise<{ messa
   const res = (await Instance.patch(base + `/pelada/${peladaId}/cancel-attendance`)).data;
 
   return { message: res.message }
+}
+
+export async function logout(): Promise<void> {
+  await Instance.post(base + "/logout");
 }

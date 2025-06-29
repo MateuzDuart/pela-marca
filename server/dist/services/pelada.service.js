@@ -12,6 +12,8 @@ const UsersSchema_1 = require("../database/models/UsersSchema");
 const GuestsSchema_1 = require("../database/models/GuestsSchema");
 const PeladaServiceError_1 = __importDefault(require("../Errors/PeladaServiceError"));
 const PaymentHistoriesSchema_1 = require("../database/models/PaymentHistoriesSchema");
+const EventsSchema_1 = require("../database/models/EventsSchema");
+const EventConfirmationSchema_1 = require("../database/models/EventConfirmationSchema");
 exports.default = new class PeladaService {
     // CREATE
     async createPelada(data, transaction) {
@@ -45,16 +47,16 @@ exports.default = new class PeladaService {
     async sendInvite(data, transaction) {
         const pelada = await PeladaSchema_1.PeladasSchema.findByPk(data.peladaId, { transaction });
         if (!pelada)
-            throw new PeladaServiceError_1.default("Pelada nao encontrada");
+            throw new PeladaServiceError_1.default("Pelada não encontrada");
         const member = await MembersSchema_1.MembersSchema.findOne({ where: { user_id: data.userId, pelada_id: data.peladaId }, transaction });
         if (member)
             throw new PeladaServiceError_1.default("Usuário já é membro na pelada");
         const user = await UsersSchema_1.UsersSchema.findByPk(data.userId, { transaction });
         if (!user)
-            throw new PeladaServiceError_1.default("Usuário nao encontrado");
+            throw new PeladaServiceError_1.default("Usuário não encontrado");
         const invite = await GuestsSchema_1.GuestsSchema.findOne({ where: { user_id: data.userId, pelada_id: data.peladaId }, transaction });
         if (invite)
-            throw new PeladaServiceError_1.default("Convite ja foi enviado");
+            throw new PeladaServiceError_1.default("Convite já foi enviado");
         await GuestsSchema_1.GuestsSchema.create({ user_id: data.userId, pelada_id: data.peladaId }, { transaction });
         return true;
     }
@@ -69,13 +71,13 @@ exports.default = new class PeladaService {
             transaction
         });
         if (!member)
-            throw new PeladaServiceError_1.default("Usuário nao tem permissao para aceitar convites");
+            throw new PeladaServiceError_1.default("Usuário não tem permissao para aceitar convites");
         const invite = await GuestsSchema_1.GuestsSchema.findByPk(data.inviteId, {
             attributes: ["user_id"],
             transaction
         });
         if (!invite)
-            throw new PeladaServiceError_1.default("Convite nao encontrado");
+            throw new PeladaServiceError_1.default("Convite não encontrado");
         invite.id = data.inviteId;
         await invite.destroy({ transaction });
         const newMember = await MembersSchema_1.MembersSchema.create({
@@ -96,10 +98,10 @@ exports.default = new class PeladaService {
             transaction
         });
         if (!member)
-            throw new PeladaServiceError_1.default("Usuário nao tem permissao para rejeitar convites");
+            throw new PeladaServiceError_1.default("Usuário não tem permissao para rejeitar convites");
         const invite = await GuestsSchema_1.GuestsSchema.findByPk(data.inviteId, { transaction });
         if (!invite)
-            throw new PeladaServiceError_1.default("Convite nao encontrado");
+            throw new PeladaServiceError_1.default("Convite não encontrado");
         await invite.destroy({ transaction });
     }
     // READ
@@ -113,7 +115,7 @@ exports.default = new class PeladaService {
             }
         });
         if (!member)
-            throw new PeladaServiceError_1.default("Usuário nao tem permissao para ver essa pelada");
+            throw new PeladaServiceError_1.default("Usuário não tem permissao para ver essa pelada");
         const pelada = await PeladaSchema_1.PeladasSchema.findByPk(peladaId, {
             attributes: ["name", "price", "payment_day", "confirmation_open_hours_before_event", "confirmation_close_hours_from_event"],
             include: [
@@ -129,7 +131,7 @@ exports.default = new class PeladaService {
             ]
         });
         if (!pelada)
-            throw new PeladaServiceError_1.default("Pelada nao encontrada");
+            throw new PeladaServiceError_1.default("Pelada não encontrada");
         return pelada;
     }
     async getPeladasAsMember(userId) {
@@ -141,6 +143,17 @@ exports.default = new class PeladaService {
                     model: PeladaSchema_1.PeladasSchema,
                     as: "pelada",
                     attributes: ["id", "name"],
+                    include: [
+                        {
+                            model: EventDaysSchema_1.EventDaysSchema,
+                            as: "schedule",
+                            attributes: ["day", "hour"],
+                            where: {
+                                is_active: true
+                            },
+                            required: false
+                        }
+                    ]
                 },
             ],
         });
@@ -218,7 +231,7 @@ exports.default = new class PeladaService {
             }
         });
         if (!member)
-            throw new PeladaServiceError_1.default("Usuário nao tem permissao para ver membros");
+            throw new PeladaServiceError_1.default("Usuário não tem permissao para ver membros");
         const members = await MembersSchema_1.MembersSchema.findAll({
             attributes: ["id", "role"],
             where: { pelada_id: peladaId },
@@ -284,7 +297,7 @@ exports.default = new class PeladaService {
             ]
         });
         if (!pelada)
-            throw new PeladaServiceError_1.default("Pelada nao encontrada");
+            throw new PeladaServiceError_1.default("Pelada não encontrada");
         const members = await MembersSchema_1.MembersSchema.findAll({
             attributes: ["role"],
             where: { pelada_id: peladaId, [sequelize_1.Op.or]: [{ role: role_1.roleMember.OWNER }, { role: role_1.roleMember.ADMIN }] },
@@ -305,6 +318,104 @@ exports.default = new class PeladaService {
         peladaInviteData["schedule"] = pelada.schedule;
         peladaInviteData["members"] = members;
         return peladaInviteData;
+    }
+    async getPelada({ userId, peladaId }) {
+        const pelada = await PeladaSchema_1.PeladasSchema.findByPk(peladaId, {
+            attributes: ["name", "confirmation_open_hours_before_event", "confirmation_close_hours_from_event"],
+            include: [
+                {
+                    model: EventDaysSchema_1.EventDaysSchema,
+                    as: "schedule",
+                    where: { is_active: true },
+                    attributes: ["day", "hour"],
+                    required: false
+                },
+                {
+                    model: MembersSchema_1.MembersSchema,
+                    as: "members",
+                    attributes: ["role"],
+                    required: false,
+                    include: [
+                        {
+                            model: UsersSchema_1.UsersSchema,
+                            as: "user",
+                            attributes: ["name", "email", "picture"],
+                            required: true
+                        }
+                    ]
+                },
+                {
+                    model: EventsSchema_1.EventsSchema,
+                    as: 'events',
+                    attributes: ['id'],
+                    include: [
+                        {
+                            model: EventConfirmationSchema_1.EventConfirmationsSchema,
+                            as: 'confirmations',
+                            attributes: ['id'],
+                            include: [
+                                {
+                                    model: MembersSchema_1.MembersSchema,
+                                    as: 'member',
+                                    attributes: ['id'],
+                                    include: [
+                                        {
+                                            model: UsersSchema_1.UsersSchema,
+                                            as: 'user',
+                                            attributes: ['id', 'name', 'picture'],
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+        if (!pelada)
+            throw new PeladaServiceError_1.default("Pelada não encontrada");
+        const member = await MembersSchema_1.MembersSchema.findOne({
+            attributes: [],
+            include: [
+                {
+                    model: UsersSchema_1.UsersSchema,
+                    as: "user",
+                    attributes: ["id"],
+                    required: false,
+                    include: [
+                        {
+                            model: PaymentHistoriesSchema_1.PaymentHistoriesSchema,
+                            as: "paymentHistories",
+                            where: { pelada_id: peladaId },
+                            limit: 1,
+                        }
+                    ]
+                }
+            ],
+            where: {
+                user_id: userId,
+                pelada_id: peladaId,
+                [sequelize_1.Op.or]: [{ role: role_1.roleMember.OWNER }, { role: role_1.roleMember.ADMIN }, { role: role_1.roleMember.MEMBER }]
+            }
+        });
+        if (!member)
+            throw new PeladaServiceError_1.default("Usuário não tem permissão para ver essa pelada");
+        const members = pelada.members?.map(member => ({
+            role: member.role,
+            name: member.user?.name || "Desconhecido",
+            picture: member.user?.picture || "",
+        })) || [];
+        const attendanceList = pelada.events?.[0]?.confirmations?.map(confirmation => ({
+            id: confirmation.member?.user?.id,
+            name: confirmation.member?.user?.name || "Desconhecido",
+            picture: confirmation.member?.user?.picture || "",
+        })) || [];
+        pelada.setDataValue("payment_status", member.user?.paymentHistories?.[0]?.status || "none");
+        pelada.setDataValue("members_list", members);
+        pelada.setDataValue("members", undefined);
+        pelada.setDataValue("attendance_list", attendanceList);
+        pelada.setDataValue("events", undefined);
+        return pelada;
     }
     // UPDATE
     async updatePelada(data, transaction) {
@@ -347,7 +458,7 @@ exports.default = new class PeladaService {
             const dayName = dayKey;
             const day = await EventDaysSchema_1.EventDaysSchema.findOne({ where: { day: dayName, pelada_id: data.peladaId }, transaction });
             if (!day)
-                throw new PeladaServiceError_1.default("Agendamento nao encontrado");
+                throw new PeladaServiceError_1.default("Agendamento não encontrado");
             const newData = {};
             if (dataDay.hour)
                 newData.hour = dataDay.hour;
@@ -373,7 +484,7 @@ exports.default = new class PeladaService {
             attributes: ["role"],
         });
         if (!memberToUpdate)
-            throw new PeladaServiceError_1.default("Usuário nao encontrado");
+            throw new PeladaServiceError_1.default("Usuário não encontrado");
         if ([role_1.roleMember.ADMIN, role_1.roleMember.OWNER].includes(memberToUpdate.role))
             return { message: "Usuário já tem permissão de admin" };
         memberToUpdate.role = role_1.roleMember.ADMIN;
@@ -391,12 +502,12 @@ exports.default = new class PeladaService {
             }
         });
         if (!member)
-            throw new PeladaServiceError_1.default("Usuário nao encontrado");
+            throw new PeladaServiceError_1.default("Usuário não encontrado");
         const memberToUpdate = await MembersSchema_1.MembersSchema.findByPk(memberId, {
             attributes: ["role"],
         });
         if (!memberToUpdate)
-            throw new PeladaServiceError_1.default("Usuário nao encontrado");
+            throw new PeladaServiceError_1.default("Usuário não encontrado");
         if (![role_1.roleMember.ADMIN, role_1.roleMember.OWNER].includes(memberToUpdate.role))
             return { message: "Usuário já não tem o cargo de admin" };
         memberToUpdate.role = role_1.roleMember.MEMBER;
@@ -404,13 +515,296 @@ exports.default = new class PeladaService {
         await memberToUpdate.save({ transaction });
         return { message: "Cargo de admin removido com sucesso" };
     }
-    // DELETE
-    async deletePelada(id) {
-        const pelada = await PeladaSchema_1.PeladasSchema.findByPk(id);
+    async setPaymentPending({ userId, peladaId, memberId, mouthReference }, transaction) {
+        const member = await MembersSchema_1.MembersSchema.findOne({
+            attributes: ["role"],
+            where: {
+                user_id: userId,
+                pelada_id: peladaId,
+                [sequelize_1.Op.or]: [{ role: role_1.roleMember.OWNER }, { role: role_1.roleMember.ADMIN }]
+            }
+        });
+        if (!member)
+            throw new PeladaServiceError_1.default("Usuário não encontrado ou você não tem permissão para essa ação");
+        const memberToUpdate = await MembersSchema_1.MembersSchema.findByPk(memberId, {
+            attributes: [],
+            include: [
+                {
+                    model: UsersSchema_1.UsersSchema,
+                    attributes: ["id"],
+                    as: "user",
+                    required: false,
+                    include: [
+                        {
+                            model: PaymentHistoriesSchema_1.PaymentHistoriesSchema,
+                            as: "paymentHistories",
+                            attributes: ["id", "status"],
+                            where: { reference_month: mouthReference, pelada_id: peladaId },
+                            required: false,
+                            limit: 1,
+                            include: [
+                                {
+                                    model: UsersSchema_1.UsersSchema,
+                                    as: "confirmedByUser",
+                                    attributes: ["name", "email"],
+                                    required: false
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+        if (!memberToUpdate)
+            throw new PeladaServiceError_1.default("Membro não encontrado");
+        const paymentHistory = memberToUpdate.user?.paymentHistories?.[0];
+        if (paymentHistory) {
+            if (paymentHistory.status === "pending")
+                return { message: "Pagamento já está pendente" };
+            if (paymentHistory.status === "paid")
+                return { message: "Pagamento já foi efetuado" };
+            paymentHistory.status = "pending";
+            await paymentHistory.save({ transaction });
+        }
+        else {
+            await PaymentHistoriesSchema_1.PaymentHistoriesSchema.create({
+                user_id: memberToUpdate.user.id,
+                pelada_id: peladaId,
+                status: "pending",
+                confirmed_by: userId,
+                reference_month: mouthReference,
+            }, { transaction });
+        }
+        return { message: "Pagamento pendente adicionado com sucesso" };
+        // await memberToUpdate.save();
+    }
+    async cancelPaymentPending({ userId, peladaId, memberId, mouthReference }, transaction) {
+        const member = await MembersSchema_1.MembersSchema.findOne({
+            attributes: ["role"],
+            where: {
+                user_id: userId,
+                pelada_id: peladaId,
+                [sequelize_1.Op.or]: [{ role: role_1.roleMember.OWNER }, { role: role_1.roleMember.ADMIN }]
+            }
+        });
+        if (!member)
+            throw new PeladaServiceError_1.default("Usuário não encontrado ou você não tem permissão para essa ação");
+        const memberToUpdate = await MembersSchema_1.MembersSchema.findByPk(memberId, {
+            attributes: [],
+            include: [
+                {
+                    model: UsersSchema_1.UsersSchema,
+                    attributes: ["id"],
+                    as: "user",
+                    required: false,
+                    include: [
+                        {
+                            model: PaymentHistoriesSchema_1.PaymentHistoriesSchema,
+                            as: "paymentHistories",
+                            attributes: ["id", "status"],
+                            where: { reference_month: mouthReference, pelada_id: peladaId },
+                            required: false,
+                            limit: 1,
+                            include: [
+                                {
+                                    model: UsersSchema_1.UsersSchema,
+                                    as: "confirmedByUser",
+                                    attributes: ["name", "email"],
+                                    required: false
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+        if (!memberToUpdate)
+            throw new PeladaServiceError_1.default("Membro não encontrado");
+        const paymentHistory = memberToUpdate.user?.paymentHistories?.[0];
+        if (!paymentHistory)
+            throw new PeladaServiceError_1.default("Pagamento não encontrado");
+        if (paymentHistory.status === "pending") {
+            paymentHistory.status = "late";
+            await paymentHistory.save({ transaction });
+        }
+        else if (paymentHistory.status === "paid") {
+            return { message: "Pagamento já foi efetuado, não é possível cancelar" };
+        }
+        else {
+            return { message: "Pagamento já está cancelado" };
+        }
+        return { message: "Pagamento cancelado com sucesso" };
+    }
+    async setPaymentPaid({ userId, peladaId, memberId, mouthReference }, transaction) {
+        const member = await MembersSchema_1.MembersSchema.findOne({
+            attributes: ["role"],
+            where: {
+                user_id: userId,
+                pelada_id: peladaId,
+                [sequelize_1.Op.or]: [{ role: role_1.roleMember.OWNER }, { role: role_1.roleMember.ADMIN }]
+            }
+        });
+        if (!member)
+            throw new PeladaServiceError_1.default("Usuário não encontrado ou você não tem permissão para essa ação");
+        const memberToUpdate = await MembersSchema_1.MembersSchema.findByPk(memberId, {
+            attributes: [],
+            include: [
+                {
+                    model: UsersSchema_1.UsersSchema,
+                    attributes: ["id"],
+                    as: "user",
+                    required: false,
+                    include: [
+                        {
+                            model: PaymentHistoriesSchema_1.PaymentHistoriesSchema,
+                            as: "paymentHistories",
+                            attributes: ["id"],
+                            where: { reference_month: mouthReference, pelada_id: peladaId },
+                            required: false,
+                            limit: 1,
+                            include: [
+                                {
+                                    model: UsersSchema_1.UsersSchema,
+                                    as: "confirmedByUser",
+                                    attributes: ["name", "email"],
+                                    required: false
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+        if (!memberToUpdate)
+            throw new PeladaServiceError_1.default("Membro não encontrado");
+        const paymentHistory = memberToUpdate.user?.paymentHistories?.[0];
+        if (paymentHistory) {
+            paymentHistory.status = "paid";
+            await paymentHistory.save({ transaction });
+        }
+        else {
+            await PaymentHistoriesSchema_1.PaymentHistoriesSchema.create({
+                user_id: memberToUpdate.user.id,
+                pelada_id: peladaId,
+                status: "paid",
+                confirmed_by: userId,
+                reference_month: mouthReference,
+            }, { transaction });
+        }
+        return { message: "Pagamento realizado com sucesso" };
+    }
+    async confirmEventAttendance({ userId, peladaId }, transaction) {
+        const member = await MembersSchema_1.MembersSchema.findOne({
+            attributes: ["id"],
+            where: {
+                user_id: userId,
+                pelada_id: peladaId,
+                [sequelize_1.Op.or]: [{ role: role_1.roleMember.OWNER }, { role: role_1.roleMember.ADMIN }, { role: role_1.roleMember.MEMBER }]
+            }
+        });
+        if (!member)
+            throw new PeladaServiceError_1.default("Usuário não tem permissão para confirmar presença no evento");
+        const pelada = await PeladaSchema_1.PeladasSchema.findByPk(peladaId, {
+            attributes: ["id", "confirmation_open_hours_before_event", "confirmation_close_hours_from_event"],
+            include: [
+                {
+                    model: EventsSchema_1.EventsSchema,
+                    as: "events",
+                    attributes: ["id", "status"],
+                },
+                {
+                    model: EventDaysSchema_1.EventDaysSchema,
+                    as: "schedule",
+                    attributes: ["day"],
+                    where: { is_active: true },
+                    required: false
+                }
+            ]
+        });
         if (!pelada)
             throw new PeladaServiceError_1.default("Pelada não encontrada");
-        await pelada.destroy();
-        return true;
+        const event = pelada.events?.[0];
+        if (!event) {
+            const event = await EventsSchema_1.EventsSchema.create({
+                pelada_id: peladaId,
+                status: "open",
+            }, { transaction });
+            await EventConfirmationSchema_1.EventConfirmationsSchema.create({
+                member_id: member.id,
+                event_id: event.id,
+            }, { transaction });
+            return true;
+        }
+        else if (event.status === "closed") {
+            throw new PeladaServiceError_1.default("Evento já está fechado para confirmações");
+        }
+        else if (event.status === "cancelled") {
+            throw new PeladaServiceError_1.default("Evento foi cancelado");
+        }
+        else {
+            await EventConfirmationSchema_1.EventConfirmationsSchema.create({
+                member_id: member.id,
+                event_id: event.id,
+            }, { transaction });
+            return true;
+        }
+    }
+    async cancelEventAttendance({ userId, peladaId }, transaction) {
+        const member = await MembersSchema_1.MembersSchema.findOne({
+            attributes: ["id"],
+            where: {
+                user_id: userId,
+                pelada_id: peladaId,
+                [sequelize_1.Op.or]: [{ role: role_1.roleMember.OWNER }, { role: role_1.roleMember.ADMIN }, { role: role_1.roleMember.MEMBER }]
+            }
+        });
+        if (!member)
+            throw new PeladaServiceError_1.default("Usuário não tem permissão para cancelar presença no evento");
+        const pelada = await PeladaSchema_1.PeladasSchema.findByPk(peladaId, {
+            include: [
+                {
+                    model: EventsSchema_1.EventsSchema,
+                    as: "events",
+                    attributes: ["id", "status"],
+                    limit: 1
+                }
+            ]
+        });
+        if (!pelada)
+            throw new PeladaServiceError_1.default("Pelada não encontrada");
+        const event = pelada.events?.[0];
+        if (!event)
+            throw new PeladaServiceError_1.default("Evento não encontrado");
+        if (event.status === "closed")
+            throw new PeladaServiceError_1.default("Evento já está fechado para confirmações");
+        if (event.status === "cancelled")
+            throw new PeladaServiceError_1.default("Evento foi cancelado");
+        const isConfirmed = await EventConfirmationSchema_1.EventConfirmationsSchema.findOne({
+            where: {
+                member_id: member.id,
+                event_id: event.id,
+            }
+        });
+        if (isConfirmed) {
+            await EventConfirmationSchema_1.EventConfirmationsSchema.destroy({ where: { member_id: member.id, event_id: event.id }, transaction });
+            return true;
+        }
+        return false;
+    }
+    // DELETE
+    async deletePelada({ userId, peladaId }, transaction) {
+        const member = await MembersSchema_1.MembersSchema.findOne({
+            attributes: ["role"],
+            where: {
+                user_id: userId,
+                pelada_id: peladaId,
+                [sequelize_1.Op.or]: [{ role: role_1.roleMember.OWNER }]
+            }
+        });
+        if (!member)
+            throw new PeladaServiceError_1.default("Usuário não encontrado ou você não tem permissão para essa ação");
+        const result = await PeladaSchema_1.PeladasSchema.destroy({ where: { id: peladaId }, transaction });
+        return result > 0;
     }
     async deleteMemberFromPelada({ userId, peladaId, memberId }) {
         const member = await MembersSchema_1.MembersSchema.findOne({
@@ -421,10 +815,10 @@ exports.default = new class PeladaService {
             }
         });
         if (!member)
-            throw new PeladaServiceError_1.default("Usuário nao encontrado");
+            throw new PeladaServiceError_1.default("Usuário não encontrado");
         const memberToDelete = await MembersSchema_1.MembersSchema.findByPk(memberId);
         if (!memberToDelete)
-            throw new PeladaServiceError_1.default("Usuário nao encontrado");
+            throw new PeladaServiceError_1.default("Usuário não encontrado");
         await memberToDelete.destroy();
         return true;
     }

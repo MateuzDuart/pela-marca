@@ -3,6 +3,9 @@ import jwt from "jsonwebtoken";
 import { verifyGoogleToken } from "../services/googleAuth.service";
 import { UsersSchema } from "../database/models/UsersSchema";
 import { OAuth2Client } from "google-auth-library";
+import { donwloadGoogleImage } from "../utils/donwloadGoogleImage";
+
+
 
 if (
   !process.env.GOOGLE_WEB_CLIENT_ID ||
@@ -57,11 +60,27 @@ export default new class AuthController {
 
       let user = await UsersSchema.findOne({ where: { email: payload.email } });
       if (!user) {
+        // 🟢 NOVO USUÁRIO → tentativa de baixar foto
         user = await UsersSchema.create({
           name: payload.name!,
           email: payload.email!,
-          picture: payload.picture,
         });
+
+        try {
+          const localImagePath = await donwloadGoogleImage(payload.picture!);
+          await user.update({ picture: localImagePath });
+        } catch (e) {
+          console.warn('Falha ao baixar imagem de perfil no cadastro:', e);
+        }
+
+      } else if (!user.picture) {
+        // 🟡 USUÁRIO EXISTENTE → tentar baixar imagem se estiver ausente
+        try {
+          const localImagePath = await donwloadGoogleImage(payload.picture!);
+          await user.update({ picture: localImagePath });
+        } catch (e) {
+          console.warn('Falha ao baixar imagem de perfil no login:', e);
+        }
       }
 
       const token = generateJWT(user.id);
@@ -127,12 +146,25 @@ export default new class AuthController {
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 dias
         path: "/",
       });
-      
+
       res.status(200).redirect(`${process.env.FRONT_END_URL}`);
 
     } catch (err) {
       console.error("Erro ao validar token:", err);
       return res.status(401).json({ message: "Token inválido ou expirado" });
     }
+  };
+
+  async logout(req: Request, res: Response): Promise<any> {
+    res.clearCookie("Authorization", {
+      httpOnly: false,                  // true em produção
+      secure: false,                    // true em produção (HTTPS)
+      sameSite: "lax",                  // "lax" ou "strict" em dev
+      domain: process.env.HOST!,
+      maxAge: 1,
+      path: "/",
+    });
+    
+    return res.status(200).json({ message: "Logout realizado com sucesso" });
   };
 };

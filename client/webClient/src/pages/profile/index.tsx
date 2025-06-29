@@ -4,6 +4,7 @@ import { useUser } from '../../context/userContext';
 import { useNavigate } from 'react-router-dom';
 import { updateUser } from '../../API/routes';
 import toast from 'react-hot-toast';
+import { API_URL } from '../../config';
 
 export default function Profile() {
   const [nome, setNome] = useState("");
@@ -17,7 +18,7 @@ export default function Profile() {
   useEffect(() => {
     if (user) {
       setNome(user.name);
-      setPreviewUrl(user.picture);
+      setPreviewUrl(`${API_URL}/images/${user.picture}`);
     } else {
       navigate('/login');
     }
@@ -63,7 +64,13 @@ export default function Profile() {
         <div className="flex flex-col items-center gap-4">
           <div className="avatar">
             <div className="w-24 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
-              <img src={previewUrl} alt="Foto de perfil" />
+              <img src={previewUrl}
+                alt="foto de perfil"
+                onError={(e) => {
+                  e.currentTarget.onerror = null; // evita loop infinito
+                  e.currentTarget.src = '/default_user.png'; // ou alguma URL pública válida
+                }}
+              />
             </div>
           </div>
 

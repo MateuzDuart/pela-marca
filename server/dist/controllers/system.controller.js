@@ -17,6 +17,7 @@ const updatePeladaSchema_1 = require("../zodSchemas/updatePeladaSchema");
 const PeladaServiceError_1 = __importDefault(require("../Errors/PeladaServiceError"));
 const acceptInviteSchema_1 = require("../zodSchemas/acceptInviteSchema");
 const getMemberSchema_1 = require("../zodSchemas/getMemberSchema");
+const paymentActionSchema_1 = require("../zodSchemas/paymentActionSchema");
 exports.default = new class SystemController {
     async home(req, res) {
         return res.status(200).json({
@@ -27,7 +28,7 @@ exports.default = new class SystemController {
     async getUserData(req, res) {
         const userId = req.userId;
         const user = await UsersSchema_1.UsersSchema.findByPk(userId, {
-            attributes: ['name', 'email', 'picture'],
+            attributes: ['id', 'name', 'email', 'picture'],
         });
         if (!user) {
             return res.status(404).json({
@@ -37,6 +38,7 @@ exports.default = new class SystemController {
         }
         const isGooglePicute = user.picture?.startsWith('https://lh3.googleusercontent.com/a/');
         return res.status(200).send({
+            id: user.id,
             name: user.name,
             email: user.email,
             picture: isGooglePicute ? user.picture : `${process.env.BASE_URL}/images/${user.picture}`,
@@ -448,6 +450,203 @@ exports.default = new class SystemController {
             console.log(error);
             return res.status(400).json({
                 message: "Erro ao excluir membro",
+            });
+        }
+    }
+    async setPaymentPending(req, res) {
+        const userId = req.userId;
+        const peladaId = req.params.id;
+        const transaction = await database_1.sequelize.transaction();
+        try {
+            const data = paymentActionSchema_1.paymentActionSchema.parse(req.body || {});
+            const response = await pelada_service_1.default.setPaymentPending({
+                userId,
+                peladaId,
+                memberId: data.member_id,
+                mouthReference: data.mouth_reference
+            }, transaction);
+            await transaction.commit();
+            return res.status(200).json({ message: response.message });
+        }
+        catch (error) {
+            await transaction.rollback();
+            if (error instanceof zod_1.ZodError) {
+                return res.status(400).send(error);
+            }
+            if (error instanceof PeladaServiceError_1.default) {
+                return res.status(400).json({
+                    message: error instanceof Error ? error.message : "Erro ao deixar pagamento do membro pendente",
+                });
+            }
+            console.log(error);
+            return res.status(400).json({
+                message: "Erro ao deixar pagamento do membro pendente",
+            });
+        }
+    }
+    async cancelPaymentPending(req, res) {
+        const userId = req.userId;
+        const peladaId = req.params.id;
+        const transaction = await database_1.sequelize.transaction();
+        try {
+            const data = paymentActionSchema_1.paymentActionSchema.parse(req.body || {});
+            const response = await pelada_service_1.default.cancelPaymentPending({
+                userId,
+                peladaId,
+                memberId: data.member_id,
+                mouthReference: data.mouth_reference
+            }, transaction);
+            await transaction.commit();
+            return res.status(200).json({ message: response.message });
+        }
+        catch (error) {
+            await transaction.rollback();
+            if (error instanceof zod_1.ZodError) {
+                return res.status(400).send(error);
+            }
+            if (error instanceof PeladaServiceError_1.default) {
+                return res.status(400).json({
+                    message: error instanceof Error ? error.message : "Erro ao cancelar pendencia de pagamento do membro",
+                });
+            }
+            console.log(error);
+            return res.status(400).json({
+                message: "Erro ao cancelar pendencia de pagamento do membro",
+            });
+        }
+    }
+    async setPaymentPaid(req, res) {
+        const userId = req.userId;
+        const peladaId = req.params.id;
+        const transaction = await database_1.sequelize.transaction();
+        try {
+            const data = paymentActionSchema_1.paymentActionSchema.parse(req.body || {});
+            const response = await pelada_service_1.default.setPaymentPaid({
+                userId,
+                peladaId,
+                memberId: data.member_id,
+                mouthReference: data.mouth_reference
+            }, transaction);
+            await transaction.commit();
+            return res.status(200).json({ message: response.message });
+        }
+        catch (error) {
+            await transaction.rollback();
+            if (error instanceof zod_1.ZodError) {
+                return res.status(400).send(error);
+            }
+            if (error instanceof PeladaServiceError_1.default) {
+                return res.status(400).json({
+                    message: error instanceof Error ? error.message : "Erro ao deixar pagamento do membro como pago",
+                });
+            }
+            console.log(error);
+            return res.status(400).json({
+                message: "Erro ao deixar pagamento do membro como pago",
+            });
+        }
+    }
+    async deletePelada(req, res) {
+        const userId = req.userId;
+        const peladaId = req.params.id;
+        const transaction = await database_1.sequelize.transaction();
+        try {
+            await pelada_service_1.default.deletePelada({ userId, peladaId }, transaction);
+            await transaction.commit();
+            return res.status(200).json({ message: "Pelada excluída com sucesso" });
+        }
+        catch (error) {
+            await transaction.rollback();
+            if (error instanceof PeladaServiceError_1.default) {
+                return res.status(400).json({
+                    message: error instanceof Error ? error.message : "Erro ao excluir pelada",
+                });
+            }
+            console.log(error);
+            return res.status(400).json({
+                message: "Erro ao excluir pelada",
+            });
+        }
+    }
+    async getPelada(req, res) {
+        const userId = req.userId;
+        const peladaId = req.params.id;
+        try {
+            const pelada = await pelada_service_1.default.getPelada({ userId, peladaId });
+            return res.status(200).json(pelada);
+        }
+        catch (error) {
+            if (error instanceof PeladaServiceError_1.default) {
+                return res.status(400).json({
+                    message: error instanceof Error ? error.message : "Erro ao buscar pelada",
+                });
+            }
+            console.log(error);
+            return res.status(400).json({
+                message: "Erro ao buscar pelada",
+            });
+        }
+    }
+    async confirmEventAttendance(req, res) {
+        const userId = req.userId;
+        const peladaId = req.params.id;
+        const transaction = await database_1.sequelize.transaction();
+        try {
+            const isConfirmed = await pelada_service_1.default.confirmEventAttendance({
+                userId,
+                peladaId,
+            }, transaction);
+            await transaction.commit();
+            if (isConfirmed) {
+                return res.status(200).json({ message: "Presença confirmada com sucesso" });
+            }
+            else {
+                return res.status(400).json({ message: "Você já confirmou presença neste evento" });
+            }
+        }
+        catch (error) {
+            await transaction.rollback();
+            if (error instanceof zod_1.ZodError) {
+                return res.status(400).send(error);
+            }
+            if (error instanceof PeladaServiceError_1.default) {
+                return res.status(400).json({
+                    message: error instanceof Error ? error.message : "Erro ao confirmar presença no evento",
+                });
+            }
+            console.log(error);
+            return res.status(400).json({
+                message: "Erro ao confirmar presença no evento",
+            });
+        }
+    }
+    async cancelEventAttendance(req, res) {
+        const userId = req.userId;
+        const peladaId = req.params.id;
+        const transaction = await database_1.sequelize.transaction();
+        try {
+            const isConfirmed = await pelada_service_1.default.cancelEventAttendance({
+                userId,
+                peladaId,
+            }, transaction);
+            await transaction.commit();
+            if (isConfirmed) {
+                return res.status(200).json({ message: "Presença cancelada com sucesso" });
+            }
+            else {
+                return res.status(400).json({ message: " Você ainda não confirmou presença neste evento" });
+            }
+        }
+        catch (error) {
+            await transaction.rollback();
+            if (error instanceof PeladaServiceError_1.default) {
+                return res.status(400).json({
+                    message: error instanceof Error ? error.message : "Erro ao cancelar presença no evento",
+                });
+            }
+            console.log(error);
+            return res.status(400).json({
+                message: "Erro ao cancelar presença no evento",
             });
         }
     }

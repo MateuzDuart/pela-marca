@@ -15,7 +15,7 @@ systemRouter.patch("/user", authenticate_1.authenticate, uploadImage_1.uploadIma
 // pelada
 systemRouter.post("/pelada", authenticate_1.authenticate, system_controller_1.default.createPelada);
 systemRouter.get("/my-peladas", authenticate_1.authenticate, system_controller_1.default.getPeladasAsMember);
-systemRouter.get("/my-peladas-as-admin", authenticate_1.authenticate, system_controller_1.default.getPeladasAsMember);
+systemRouter.get("/my-peladas-as-admin", authenticate_1.authenticate, system_controller_1.default.getPeladasAsAdmin);
 systemRouter.patch("/pelada/:id", authenticate_1.authenticate, system_controller_1.default.updatePelada);
 systemRouter.post("/send-invite/:id", authenticate_1.authenticate, system_controller_1.default.sendInvite);
 systemRouter.get("/invites/:id", authenticate_1.authenticate, system_controller_1.default.getInvites);
@@ -28,4 +28,11 @@ systemRouter.get("/invite/:id", optionalAuthentication_1.optionalAuthentication,
 systemRouter.delete("/member/:id", authenticate_1.authenticate, system_controller_1.default.deleteMember);
 systemRouter.patch("/member-role/:id", authenticate_1.authenticate, system_controller_1.default.setAdminRole);
 systemRouter.patch("/remove-member-role/:id", authenticate_1.authenticate, system_controller_1.default.removeAdminRole);
+systemRouter.patch("/payments/:id/pending", authenticate_1.authenticate, system_controller_1.default.setPaymentPending);
+systemRouter.patch("/payments/:id/paid", authenticate_1.authenticate, system_controller_1.default.setPaymentPaid);
+systemRouter.patch("/payments/:id/cancel-pending", authenticate_1.authenticate, system_controller_1.default.cancelPaymentPending);
+systemRouter.delete("/pelada/:id", authenticate_1.authenticate, system_controller_1.default.deletePelada);
+systemRouter.get("/pelada/:id", authenticate_1.authenticate, system_controller_1.default.getPelada);
+systemRouter.patch("/pelada/:id/confirm-attendance", authenticate_1.authenticate, system_controller_1.default.confirmEventAttendance);
+systemRouter.patch("/pelada/:id/cancel-attendance", authenticate_1.authenticate, system_controller_1.default.cancelEventAttendance);
 exports.default = systemRouter;

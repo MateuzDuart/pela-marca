@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useUser } from '../../context/userContext';
+import { useQuery } from '@tanstack/react-query';
+import { getMyPeladas } from '../../API/routes';
+import { API_URL } from '../../config';
 
 interface SidebarProps {
   open: boolean;
@@ -9,9 +12,16 @@ interface SidebarProps {
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const navigate = useNavigate();
-  const { user, peladas, isPeladasLoading } = useUser();
+  const { user } = useUser();
   const isLoggedIn = !!user;
   const [expanded, setExpanded] = useState(true);
+
+  const { data: peladas, isLoading: isPeladasLoading } = useQuery({
+    queryKey: ['my-peladas-as-member'],
+    queryFn: getMyPeladas,
+    staleTime: 1000 * 60 * 5,
+    retry: false,
+  });
 
   const handleNavigate = (path: string) => {
     onClose();
@@ -39,7 +49,13 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             >
               <div className="avatar">
                 <div className="w-10 rounded-full">
-                  <img src={user.picture} alt="avatar" />
+                   <img src={user? `${API_URL}/images/${user.picture}` : '/default_user.png'}
+                    alt="avatar"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null; // evita loop infinito
+                      e.currentTarget.src = '/default_user.png'; // ou alguma URL pública válida
+                    }}
+                  />
                 </div>
               </div>
               <div>

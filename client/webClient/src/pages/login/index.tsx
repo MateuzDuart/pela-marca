@@ -10,7 +10,7 @@ export default function Login() {
 
   useEffect(() => {
     if (user) {
-      navigate(-1);
+      navigate('/inicio');
     }
   }, [user]);
 
@@ -32,7 +32,7 @@ export default function Login() {
         </button>
 
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate("/inicio")}
           className="btn btn-ghost btn-sm mt-2"
         >
           Voltar
