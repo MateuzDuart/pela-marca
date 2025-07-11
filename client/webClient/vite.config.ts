@@ -40,10 +40,32 @@ export default defineConfig({
           }
         ]
       },
+      workbox: {
+        runtimeCaching: [
+          {
+            // 👇 Ignora cache para a rota crítica de login
+            urlPattern: /^https:\/\/pelamarca\.com\/api\/v1\/auth\/google/,
+            handler: 'NetworkOnly',
+          },
+          {
+            // 👇 Aplica cache normalmente para todo o restante do site
+            urlPattern: /^https:\/\/pelamarca\.com\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'static-cache',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 dias
+              },
+            },
+          }
+        ]
+      }
     }),
   ],
   server: {
     host: true, // ou use '0.0.0.0'
     port: 5173, // ou qualquer outra porta que quiser
+    allowedHosts: true
   },
 })

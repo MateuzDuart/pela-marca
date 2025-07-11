@@ -776,7 +776,7 @@ export default new class PeladaService {
         {
           model: EventDaysSchema,
           as: "schedule",
-          attributes: ["day"],
+          attributes: ["day", "hour"],
           where: { is_active: true },
           required: false
         }

@@ -7,6 +7,7 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const googleAuth_service_1 = require("../services/googleAuth.service");
 const UsersSchema_1 = require("../database/models/UsersSchema");
 const google_auth_library_1 = require("google-auth-library");
+const donwloadGoogleImage_1 = require("../utils/donwloadGoogleImage");
 if (!process.env.GOOGLE_WEB_CLIENT_ID ||
     !process.env.GOOGLE_WEB_CLIENT_SECRET ||
     !process.env.GOOGLE_REDIRECT_URI) {
@@ -48,11 +49,28 @@ exports.default = new class AuthController {
                 return res.status(401).send("Token inválido");
             let user = await UsersSchema_1.UsersSchema.findOne({ where: { email: payload.email } });
             if (!user) {
+                // 🟢 NOVO USUÁRIO → tentativa de baixar foto
                 user = await UsersSchema_1.UsersSchema.create({
                     name: payload.name,
                     email: payload.email,
-                    picture: payload.picture,
                 });
+                try {
+                    const localImagePath = await (0, donwloadGoogleImage_1.donwloadGoogleImage)(payload.picture);
+                    await user.update({ picture: localImagePath });
+                }
+                catch (e) {
+                    console.warn('Falha ao baixar imagem de perfil no cadastro:', e);
+                }
+            }
+            else if (!user.picture) {
+                // 🟡 USUÁRIO EXISTENTE → tentar baixar imagem se estiver ausente
+                try {
+                    const localImagePath = await (0, donwloadGoogleImage_1.donwloadGoogleImage)(payload.picture);
+                    await user.update({ picture: localImagePath });
+                }
+                catch (e) {
+                    console.warn('Falha ao baixar imagem de perfil no login:', e);
+                }
             }
             const token = generateJWT(user.id);
             return res.redirect(`${process.env.SUCCESS_REDIRECT_URL}?token=${token}`);
@@ -116,6 +134,18 @@ exports.default = new class AuthController {
             console.error("Erro ao validar token:", err);
             return res.status(401).json({ message: "Token inválido ou expirado" });
         }
+    }
+    ;
+    async logout(req, res) {
+        res.clearCookie("Authorization", {
+            httpOnly: false, // true em produção
+            secure: false, // true em produção (HTTPS)
+            sameSite: "lax", // "lax" ou "strict" em dev
+            domain: process.env.HOST,
+            maxAge: 1,
+            path: "/",
+        });
+        return res.status(200).json({ message: "Logout realizado com sucesso" });
     }
     ;
 };

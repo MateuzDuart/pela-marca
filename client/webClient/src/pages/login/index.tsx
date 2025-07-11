@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { FcGoogle } from 'react-icons/fc';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../context/userContext';
-import { API_URL } from '../../config';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -15,7 +14,9 @@ export default function Login() {
   }, [user]);
 
   const handleLogin = () => {
-    document.location.href = `${API_URL}/api/v1/auth/google`;
+      setTimeout(() => {
+    window.location.href = 'https://pelamarca.com/api/v1/auth/google';
+  }, 0);
   };
 
   return (

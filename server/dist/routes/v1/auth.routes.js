@@ -10,4 +10,5 @@ authRouter.get("/auth/google", auth_controller_1.default.redirectToGoogle); // N
 authRouter.get("/auth/google/callback", auth_controller_1.default.handleGoogleCallback); // NOVO
 authRouter.post("/auth/google", auth_controller_1.default.generateToken); // mantém caso use o fluxo via idToken
 authRouter.get("/auth/google/validate", auth_controller_1.default.validateToken);
+authRouter.post("/logout", auth_controller_1.default.logout);
 exports.default = authRouter;

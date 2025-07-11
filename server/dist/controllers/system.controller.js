@@ -36,12 +36,11 @@ exports.default = new class SystemController {
                 status: 'error',
             });
         }
-        const isGooglePicute = user.picture?.startsWith('https://lh3.googleusercontent.com/a/');
         return res.status(200).send({
             id: user.id,
             name: user.name,
             email: user.email,
-            picture: isGooglePicute ? user.picture : `${process.env.BASE_URL}/images/${user.picture}`,
+            picture: user.picture,
         });
     }
     async updateProfile(req, res) {
@@ -104,13 +103,13 @@ exports.default = new class SystemController {
     async createPelada(req, res) {
         const userId = req.userId;
         const schedule = {
-            monday: { hour: "00:00" },
-            tuesday: { hour: "00:00" },
-            wednesday: { hour: "00:00" },
-            thursday: { hour: "00:00" },
-            friday: { hour: "00:00" },
-            saturday: { hour: "00:00" },
-            sunday: { hour: "00:00" },
+            monday: { hour: null },
+            tuesday: { hour: null },
+            wednesday: { hour: null },
+            thursday: { hour: null },
+            friday: { hour: null },
+            saturday: { hour: null },
+            sunday: { hour: null },
         };
         const transaction = await database_1.sequelize.transaction();
         try {
@@ -129,6 +128,7 @@ exports.default = new class SystemController {
             await transaction.commit();
             return res.status(201).json({
                 message: "Pelada criada com sucesso",
+                id: pelada.id
             });
         }
         catch (err) {

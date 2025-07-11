@@ -17,10 +17,20 @@ baseDate = new Date()) {
     if (targetIndex === -1) {
         throw new Error(`Dia inválido: ${weekday}. Use nomes em inglês (ex: "monday").`);
     }
-    const currentDayIndex = baseDate.getDay(); // 0 = domingo, 1 = segunda, ...
+    const currentDayIndex = baseDate.getDay();
     let diff = targetIndex - currentDayIndex;
     if (diff <= 0) {
-        diff += 7; // próxima ocorrência
+        if (hour) {
+            const [hh, mm] = hour.split(':').map(Number);
+            const targetTime = new Date(baseDate);
+            targetTime.setHours(hh, mm, 0, 0);
+            if (baseDate >= targetTime) {
+                diff = 7;
+            }
+        }
+        else {
+            diff = 7;
+        }
     }
     const nextDate = new Date(baseDate);
     nextDate.setDate(baseDate.getDate() + diff);

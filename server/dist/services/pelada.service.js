@@ -14,6 +14,9 @@ const PeladaServiceError_1 = __importDefault(require("../Errors/PeladaServiceErr
 const PaymentHistoriesSchema_1 = require("../database/models/PaymentHistoriesSchema");
 const EventsSchema_1 = require("../database/models/EventsSchema");
 const EventConfirmationSchema_1 = require("../database/models/EventConfirmationSchema");
+const checkIfOpen_1 = require("../utils/checkIfOpen");
+const getNextAvailableDay_1 = require("../utils/getNextAvailableDay");
+const getNextWeekDay_1 = require("../utils/getNextWeekDay");
 exports.default = new class PeladaService {
     // CREATE
     async createPelada(data, transaction) {
@@ -124,7 +127,7 @@ exports.default = new class PeladaService {
                     as: "schedule",
                     attributes: ["day", "hour", "is_active"],
                     where: {
-                        hour: { [sequelize_1.Op.not]: "00:00:00" }
+                        hour: { [sequelize_1.Op.not]: null }
                     },
                     required: false
                 }
@@ -142,7 +145,7 @@ exports.default = new class PeladaService {
                 {
                     model: PeladaSchema_1.PeladasSchema,
                     as: "pelada",
-                    attributes: ["id", "name"],
+                    attributes: ["id", "name", "payment_day", "confirmation_open_hours_before_event", "confirmation_close_hours_from_event"],
                     include: [
                         {
                             model: EventDaysSchema_1.EventDaysSchema,
@@ -711,11 +714,20 @@ exports.default = new class PeladaService {
                     model: EventsSchema_1.EventsSchema,
                     as: "events",
                     attributes: ["id", "status"],
+                    include: [
+                        {
+                            model: EventConfirmationSchema_1.EventConfirmationsSchema,
+                            as: "confirmations",
+                            attributes: ["id"],
+                            where: { member_id: member.id },
+                            required: false
+                        }
+                    ]
                 },
                 {
                     model: EventDaysSchema_1.EventDaysSchema,
                     as: "schedule",
-                    attributes: ["day"],
+                    attributes: ["day", "hour"],
                     where: { is_active: true },
                     required: false
                 }
@@ -725,6 +737,21 @@ exports.default = new class PeladaService {
             throw new PeladaServiceError_1.default("Pelada não encontrada");
         const event = pelada.events?.[0];
         if (!event) {
+            const schedule = pelada.schedule;
+            if (!schedule) {
+                throw new PeladaServiceError_1.default("Agendamento não encontrado");
+            }
+            ;
+            const nextAvailableDayName = (0, getNextAvailableDay_1.getNextAvailableDay)(schedule.map(day => day.day));
+            const nextAvailableDay = schedule.find(day => day.day === nextAvailableDayName);
+            if (!nextAvailableDay) {
+                throw new PeladaServiceError_1.default("Agendamento não encontrado_");
+            }
+            ;
+            const nextDate = (0, getNextWeekDay_1.getNextWeekday)(nextAvailableDay.day, nextAvailableDay.hour || undefined);
+            const isEventOpen = (0, checkIfOpen_1.checkIfOpen)(nextDate, pelada.confirmation_open_hours_before_event, pelada.confirmation_close_hours_from_event);
+            if (!isEventOpen)
+                throw new PeladaServiceError_1.default("Evento está fechado para confirmações");
             const event = await EventsSchema_1.EventsSchema.create({
                 pelada_id: peladaId,
                 status: "open",
@@ -742,6 +769,8 @@ exports.default = new class PeladaService {
             throw new PeladaServiceError_1.default("Evento foi cancelado");
         }
         else {
+            if (event.confirmations?.length)
+                throw new PeladaServiceError_1.default("Você já confirmou presenca neste evento");
             await EventConfirmationSchema_1.EventConfirmationsSchema.create({
                 member_id: member.id,
                 event_id: event.id,
